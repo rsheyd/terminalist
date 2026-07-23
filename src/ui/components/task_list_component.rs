@@ -715,7 +715,12 @@ impl Component for TaskListComponent {
                 self.next_task();
                 Action::None
             }
-            KeyCode::Enter | KeyCode::Char(' ') => {
+            KeyCode::Enter => self.get_selected_task().map_or(Action::None, |task| {
+                Action::ShowDialog(DialogType::TaskDetails {
+                    task: Box::new(task.clone()),
+                })
+            }),
+            KeyCode::Char(' ') => {
                 let action = Action::toggle_tasks(self.target_tasks());
                 self.clear_marked_tasks();
                 action

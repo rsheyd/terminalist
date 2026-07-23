@@ -1,13 +1,109 @@
 use super::common::{self, shortcuts};
-use crate::entities::project;
+use crate::entities::{project, task};
 use crate::icons::IconService;
 use crate::ui::layout::LayoutManager;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::Color,
-    widgets::Clear,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
+
+pub fn render_task_details_dialog(
+    f: &mut Frame,
+    area: Rect,
+    task: &task::Model,
+    project_name: &str,
+    scroll_offset: usize,
+    scrollbar_state: &mut ScrollbarState,
+) {
+    let dialog_area = LayoutManager::centered_rect(80, 80, area);
+    f.render_widget(Clear, dialog_area);
+
+    let block = common::create_dialog_block("Task Details", Color::Cyan);
+    let inner = block.inner(dialog_area);
+    let layout = Layout::vertical([Constraint::Min(1), Constraint::Length(1)])
+        .margin(1)
+        .split(inner);
+    let content_area = layout[0];
+
+    let status = if task.is_deleted {
+        "Deleted"
+    } else if task.is_completed {
+        "Completed"
+    } else {
+        "Active"
+    };
+    let priority = match task.priority {
+        4 => "P1 (urgent)",
+        3 => "P2 (high)",
+        2 => "P3 (medium)",
+        _ => "P4 (normal)",
+    };
+    let due = task.due_datetime.as_deref().or(task.due_date.as_deref()).unwrap_or("None");
+    let description = task.description.as_deref().filter(|value| !value.is_empty()).unwrap_or("None");
+
+    let mut lines = vec![
+        Line::from(Span::styled(
+            task.content.clone(),
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        detail_line("Status", status),
+        detail_line("Project", project_name),
+        detail_line("Priority", priority),
+        detail_line("Due", due),
+        detail_line("Deadline", task.deadline.as_deref().unwrap_or("None")),
+        detail_line("Duration", task.duration.as_deref().unwrap_or("None")),
+        detail_line("Recurring", if task.is_recurring { "Yes" } else { "No" }),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Description",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )),
+    ];
+    lines.extend(description.lines().map(|line| Line::from(line.to_string())));
+
+    let content_length = lines.len();
+    let visible_height = content_area.height as usize;
+    let max_scroll = content_length.saturating_sub(visible_height);
+    let clamped_offset = scroll_offset.min(max_scroll);
+    *scrollbar_state = scrollbar_state
+        .content_length(content_length)
+        .viewport_content_length(visible_height)
+        .position(clamped_offset);
+
+    let details = Paragraph::new(lines)
+        .wrap(Wrap { trim: false })
+        .scroll((clamped_offset as u16, 0));
+    let instructions = Paragraph::new("Esc close • j/k or ↑/↓ scroll")
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center);
+
+    f.render_widget(block, dialog_area);
+    f.render_widget(details, content_area);
+    f.render_widget(instructions, layout[1]);
+
+    if content_length > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓"))
+            .track_symbol(Some("│"))
+            .thumb_symbol("▐");
+        f.render_stateful_widget(scrollbar, content_area, scrollbar_state);
+    }
+}
+
+fn detail_line(label: &'static str, value: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!("{label}: "),
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(value.to_string()),
+    ])
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn render_task_dialog(

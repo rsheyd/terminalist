@@ -12,7 +12,8 @@ This document lists all available keyboard shortcuts and TUI controls.
 
 - **`x`** Mark or unmark a task for bulk actions
 - **`Esc`** Clear all marked tasks
-- **`Space`** or **`Enter`** Toggle completion for marked tasks, or the current task when none are marked
+- **`Enter`** Open the selected task's details dialog
+- **`Space`** Toggle completion for marked tasks, or the current task when none are marked
 - **`a`** Create new task
 - **`d`** Delete selected task (with confirmation)
 - **`p`** Cycle task priority
@@ -74,6 +75,7 @@ currently highlighted task.
   - Takes remaining width after projects list
   - Displays task content, priority, labels, and status
 - **Help Panel**: Modal overlay accessible with `?` key
+- **Task Details**: Read-only modal dialog showing the full task title, description, project, priority, due information, and status
 - **Shortcut Bar**: Common controls shown along the bottom (configurable with `shortcut_bar_visible`)
 
 ## Agenda
@@ -90,4 +92,4 @@ Tasks are displayed with:
 - **Label Badges**: Colored badges showing task labels
 - **Task Content**: Truncated to fit the display width
 - **Completion Visual**: Completed tasks appear dimmed
-- **Interactive**: Press Space or Enter to toggle completion
+- **Interactive**: Press Enter for details or Space to toggle completion

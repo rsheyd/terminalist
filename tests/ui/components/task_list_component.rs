@@ -69,6 +69,33 @@ fn test_task_list_component_creation() {
 }
 
 #[test]
+fn enter_opens_details_for_selected_task() {
+    let project = project();
+    let component_task = task("A complete task title", project.uuid, false);
+    let mut component = component_with_tasks(vec![component_task.clone()], project);
+
+    let action = component.handle_key_events(key(KeyCode::Enter));
+
+    assert!(matches!(
+        action,
+        Action::ShowDialog(terminalist::ui::core::actions::DialogType::TaskDetails { task })
+            if task.uuid == component_task.uuid
+    ));
+}
+
+#[test]
+fn space_still_toggles_selected_task() {
+    let project = project();
+    let component_task = task("toggle me", project.uuid, false);
+    let task_uuid = component_task.uuid;
+    let mut component = component_with_tasks(vec![component_task], project);
+
+    let action = component.handle_key_events(key(KeyCode::Char(' ')));
+
+    assert!(matches!(action, Action::ToggleTasks(tasks) if tasks == vec![(task_uuid, false)]));
+}
+
+#[test]
 fn agenda_assigns_local_suggestions_and_preserves_real_times() {
     let project = project();
     let mut timed = task("timed", project.uuid, false);

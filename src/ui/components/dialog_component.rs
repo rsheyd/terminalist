@@ -565,6 +565,34 @@ impl Component for DialogComponent {
         }
 
         match &self.dialog_type {
+            Some(DialogType::TaskDetails { .. }) => match key.code {
+                KeyCode::Esc | KeyCode::Enter => Action::HideDialog,
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.scroll_up();
+                    Action::None
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.scroll_down();
+                    Action::None
+                }
+                KeyCode::PageUp => {
+                    self.page_up();
+                    Action::None
+                }
+                KeyCode::PageDown => {
+                    self.page_down();
+                    Action::None
+                }
+                KeyCode::Home => {
+                    self.scroll_to_top();
+                    Action::None
+                }
+                KeyCode::End => {
+                    self.scroll_to_bottom();
+                    Action::None
+                }
+                _ => Action::None,
+            },
             Some(DialogType::Info(_)) | Some(DialogType::Error(_)) => {
                 // Info/error dialogs with scrolling support
                 match key.code {
@@ -979,6 +1007,22 @@ impl Component for DialogComponent {
     fn render(&mut self, f: &mut Frame, rect: Rect) {
         if let Some(dialog_type) = self.dialog_type.clone() {
             match dialog_type {
+                DialogType::TaskDetails { task } => {
+                    let project_name = self
+                        .projects
+                        .iter()
+                        .find(|project| project.uuid == task.project_uuid)
+                        .map(|project| project.name.as_str())
+                        .unwrap_or("Unknown");
+                    task_dialogs::render_task_details_dialog(
+                        f,
+                        rect,
+                        &task,
+                        project_name,
+                        self.scroll_offset,
+                        &mut self.scrollbar_state,
+                    );
+                }
                 DialogType::TaskCreation { .. } => self.render_task_creation_dialog(f, rect),
                 DialogType::TaskEdit { .. } => self.render_task_edit_dialog(f, rect),
                 DialogType::TaskTime { .. } => {

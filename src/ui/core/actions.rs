@@ -153,6 +153,9 @@ impl Action {
 
 #[derive(Debug, Clone)]
 pub enum DialogType {
+    TaskDetails {
+        task: Box<task::Model>,
+    },
     TaskCreation {
         default_project_uuid: Option<Uuid>,
         default_due_date: Option<String>,

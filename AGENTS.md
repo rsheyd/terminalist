@@ -10,3 +10,4 @@
 - `src/ui/`: actions, navigation, dialogs, and TUI components.
 - `tests/`: integration and UI behavior tests.
 - `docs/KEYBOARD_SHORTCUTS.md`: user-facing controls and view behavior.
+- `docs/POST_PR188_CHANGES.md`: branch-local feature ledger and future PR source notes.

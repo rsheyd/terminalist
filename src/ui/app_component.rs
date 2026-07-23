@@ -1266,6 +1266,7 @@ impl AppComponent {
         if selection == &SidebarSelection::Trash {
             &[
                 ("j/k", "navigate"),
+                ("Enter", "details"),
                 ("x", "select"),
                 ("d", "restore"),
                 ("D", "empty trash"),
@@ -1277,6 +1278,7 @@ impl AppComponent {
         } else if selection == &SidebarSelection::Agenda {
             &[
                 ("j/k", "navigate"),
+                ("Enter", "details"),
                 ("Space", "toggle complete"),
                 ("s", "set time"),
                 ("/", "search"),
@@ -1287,6 +1289,7 @@ impl AppComponent {
         } else {
             &[
                 ("j/k", "navigate"),
+                ("Enter", "details"),
                 ("x", "select"),
                 ("Space", "toggle complete"),
                 ("a", "add"),

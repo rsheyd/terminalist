@@ -198,7 +198,7 @@ NAVIGATION
 j/k         Navigate tasks (down/up)
 J/K         Navigate projects (down/up)
 Mouse       Click sidebar items to navigate
-Enter       Select project/task or confirm action
+Enter       Open task details or confirm action
 Esc         Cancel action or close dialogs
 
 PROJECT & LABEL MANAGEMENT
@@ -210,6 +210,7 @@ D           Delete selected project/label; empty Trash when viewing Trash
 TASK MANAGEMENT
 --------------
 Space       Toggle task completion
+Enter       Open selected task details
 x           Mark/unmark task for bulk actions
 Esc         Clear marked tasks
 a           Create new task
