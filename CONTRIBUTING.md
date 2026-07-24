@@ -47,7 +47,7 @@ The version output includes the Git commit and indicates whether the build
 contained uncommitted changes:
 
 ```text
-terminalist 0.6.1-dev (74f4f78, dirty)
+terminalist 0.6.0-dev.1 (74f4f78, dirty)
 ```
 
 Run `command -v terminalist` if the command does not appear to use the expected
@@ -61,13 +61,21 @@ cargo uninstall terminalist
 
 ## Versioning
 
-Do not bump the package version for ordinary feature or bug-fix PRs.
-Development builds identify their exact source revision through
-`terminalist --version`.
+Once development moves beyond a release, set the package version to the next
+planned minor release with a numbered prerelease suffix, such as
+`0.6.0-dev.1`. This keeps locally installed development builds distinguishable
+from the latest stable release.
 
-Release-preparation changes should update the semantic version in `Cargo.toml`
-and run `cargo check` to update `Cargo.lock`. Commit both files together.
-Development versions use the `-dev` suffix, such as `0.6.1-dev`.
+Increment the `dev.N` number when publishing or sharing another meaningful
+development snapshot. Use `0.6.0-rc.1`, `rc.2`, and so on for release
+candidates, then remove the suffix for the final `0.6.0` release. Ordinary
+commits within the same snapshot do not require a version bump because
+`terminalist --version` also identifies the exact Git revision.
+
+Every version change must update the semantic version in `Cargo.toml`, run
+`cargo check` to update `Cargo.lock`, and commit both files together. Keep
+notable development changes under `CHANGELOG.md`'s `Unreleased` section until
+the final release is prepared.
 
 ## Reporting issues
 

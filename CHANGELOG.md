@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Incremental Todoist Sync** - Persist Todoist Sync API tokens and retrieve only remote changes after the initial full synchronization
+
+### Changed
+- **Responsive Refreshes** - Keep navigation and read-only interactions available while post-sync data reloads finish, blocking only mutations
+- **Transactional Sync Tokens** - Commit Todoist deltas and their replacement sync tokens together, with automatic full-sync recovery for rejected tokens
+
 ## [0.5.0] - 2026-03-25
 
 ### Added
