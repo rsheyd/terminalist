@@ -32,7 +32,7 @@ use uuid::Uuid;
 /// - Labels (for filtering tasks by label)
 ///
 /// Features:
-/// - Keyboard navigation (Up/Down arrows, Enter to select)
+/// - Dedicated keyboard navigation shortcuts
 /// - Mouse support (click to select)
 /// - Visual indicators for the current selection
 /// - Dynamic updates when projects/labels change
@@ -49,7 +49,6 @@ pub struct SidebarComponent {
     scrollbar_helper: ScrollbarHelper,
     navigation_counts: NavigationCounts,
     current_view_count: usize,
-    focused: bool,
 }
 
 impl Default for SidebarComponent {
@@ -74,7 +73,6 @@ impl SidebarComponent {
             scrollbar_helper: ScrollbarHelper::new(),
             navigation_counts: NavigationCounts::default(),
             current_view_count: 0,
-            focused: false,
         }
     }
 
@@ -124,10 +122,6 @@ impl SidebarComponent {
             .max()
             .unwrap_or(1);
         (longest + count_width + 3).clamp(SIDEBAR_MIN_WIDTH as usize, SIDEBAR_MAX_WIDTH as usize) as u16
-    }
-
-    pub fn set_focused(&mut self, focused: bool) {
-        self.focused = focused;
     }
 
     fn item_count(&self, item: &SidebarItemType) -> usize {
@@ -492,7 +486,9 @@ impl Component for SidebarComponent {
                 }
                 Action::None
             }
-            KeyCode::Char('J') | KeyCode::Down if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('J') | KeyCode::Char(']') | KeyCode::Down
+                if !key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
                 // Move to next selectable item, skipping non-selectable items (folders)
                 let current_index = self.list_state.selected().unwrap_or(0);
 
@@ -510,7 +506,7 @@ impl Component for SidebarComponent {
                 }
                 Action::None
             }
-            KeyCode::Char('K') | KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('K') | KeyCode::Char('[') | KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 // Move to previous selectable item, skipping non-selectable items (folders)
                 let current_index = self.list_state.selected().unwrap_or(0);
 
@@ -580,7 +576,7 @@ impl Component for SidebarComponent {
         self.scrollbar_helper
             .update_state(total_items, current_position, Some(available_height));
 
-        let pane_color = if self.focused { Color::Cyan } else { Color::DarkGray };
+        let pane_color = Color::DarkGray;
         let list = List::new(all_items)
             .block(
                 Block::default()

@@ -5,8 +5,12 @@ This document lists all available keyboard shortcuts and TUI controls.
 ## Navigation
 
 - **`j/k`** Navigate between tasks (down/up)
-- **`J/K`** Navigate between projects (down/up)
+- **`]/[`** or **`J/K`** Navigate between navigation items (down/up)
+- **`H/L`** Collapse/expand the selected project folder
 - **Mouse** Click on sidebar items to navigate
+
+The task list is always the active pane. Navigation shortcuts change the
+selected view without moving keyboard focus away from the task list.
 
 ## Task Management
 

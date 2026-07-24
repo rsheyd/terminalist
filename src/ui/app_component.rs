@@ -95,15 +95,8 @@ pub struct AppComponent {
     sidebar_width: u16,
     sidebar_width_override: Option<u16>,
     resizing_sidebar: bool,
-    active_pane: ActivePane,
     screen_width: u16,
     screen_height: u16,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum ActivePane {
-    Navigation,
-    Tasks,
 }
 
 impl AppComponent {
@@ -138,7 +131,6 @@ impl AppComponent {
             sidebar_width: 30, // Default width
             sidebar_width_override,
             resizing_sidebar: false,
-            active_pane: ActivePane::Tasks,
             screen_width: 100, // Default width
             screen_height: 50, // Default height
         }
@@ -1110,12 +1102,10 @@ impl AppComponent {
                         self.resizing_sidebar = true;
                         Action::None
                     } else if self.sidebar_visible && mouse.column < self.sidebar_width {
-                        self.active_pane = ActivePane::Navigation;
                         // Mouse is in sidebar area
                         let sidebar_area = Rect::new(0, 0, self.sidebar_width, self.screen_height);
                         self.sidebar.handle_mouse(mouse, sidebar_area)
                     } else {
-                        self.active_pane = ActivePane::Tasks;
                         // Mouse is in task list area - calculate proper width
                         let task_list_width = self.screen_width.saturating_sub(self.sidebar_width).max(1);
                         let task_list_area = Rect::new(self.sidebar_width, 0, task_list_width, self.screen_height);
@@ -1138,21 +1128,20 @@ impl AppComponent {
                         }
                         _ => Action::None,
                     }
-                } else if key.code == KeyCode::Left && self.sidebar_visible {
-                    self.active_pane = ActivePane::Navigation;
-                    Action::None
-                } else if key.code == KeyCode::Right {
-                    self.active_pane = ActivePane::Tasks;
-                    Action::None
                 } else {
-                    let pane_action = match self.active_pane {
-                        ActivePane::Navigation => self.sidebar.handle_key_events(key),
-                        ActivePane::Tasks => self.task_list.handle_key_events(key),
+                    let component_action = match key.code {
+                        KeyCode::Char('J')
+                        | KeyCode::Char('K')
+                        | KeyCode::Char('[')
+                        | KeyCode::Char(']')
+                        | KeyCode::Char('H')
+                        | KeyCode::Char('L') => self.sidebar.handle_key_events(key),
+                        _ => self.task_list.handle_key_events(key),
                     };
-                    if matches!(pane_action, Action::None) {
+                    if matches!(component_action, Action::None) {
                         self.handle_global_key(key)
                     } else {
-                        pane_action
+                        component_action
                     }
                 }
             }
@@ -1238,10 +1227,8 @@ impl Component for AppComponent {
 
         // Render components
         if self.sidebar_visible {
-            self.sidebar.set_focused(self.active_pane == ActivePane::Navigation);
             self.sidebar.render(f, main_chunks[0]);
         }
-        self.task_list.set_focused(self.active_pane == ActivePane::Tasks);
         self.task_list.set_processing(self.task_manager.processing_description());
         self.task_list.render(f, main_chunks[1]);
 
@@ -1266,6 +1253,7 @@ impl AppComponent {
         if selection == &SidebarSelection::Trash {
             &[
                 ("j/k", "navigate"),
+                ("]/[", "views"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("d", "restore"),
@@ -1278,6 +1266,7 @@ impl AppComponent {
         } else if selection == &SidebarSelection::Agenda {
             &[
                 ("j/k", "navigate"),
+                ("]/[", "views"),
                 ("Enter", "details"),
                 ("Space", "toggle complete"),
                 ("s", "set time"),
@@ -1289,6 +1278,7 @@ impl AppComponent {
         } else {
             &[
                 ("j/k", "navigate"),
+                ("]/[", "views"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("Space", "toggle complete"),

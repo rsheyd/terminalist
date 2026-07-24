@@ -53,7 +53,6 @@ pub struct TaskListComponent {
     pub display_config: DisplayConfig,
     pub marked_task_ids: HashSet<Uuid>,
     scrollbar_helper: ScrollbarHelper,
-    focused: bool,
     processing_message: Option<String>,
 }
 
@@ -79,7 +78,6 @@ impl TaskListComponent {
             display_config: DisplayConfig::default(),
             marked_task_ids: HashSet::new(),
             scrollbar_helper: ScrollbarHelper::new(),
-            focused: true,
             processing_message: None,
         }
     }
@@ -90,10 +88,6 @@ impl TaskListComponent {
 
     pub fn update_all_tasks(&mut self, all_tasks: Vec<task::Model>) {
         self.all_tasks = all_tasks;
-    }
-
-    pub fn set_focused(&mut self, focused: bool) {
-        self.focused = focused;
     }
 
     pub fn set_processing(&mut self, message: Option<String>) {
@@ -827,7 +821,7 @@ impl Component for TaskListComponent {
         // Calculate areas for list and scrollbar using helper
         let (list_area, scrollbar_area) = ScrollbarHelper::calculate_areas(rect, total_items);
 
-        let pane_color = if self.focused { Color::Cyan } else { Color::DarkGray };
+        let pane_color = Color::Cyan;
         let empty_message = if self.items.is_empty() {
             // Show contextual empty state message
             Some(match &self.sidebar_selection {

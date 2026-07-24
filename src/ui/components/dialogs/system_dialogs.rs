@@ -196,7 +196,8 @@ TERMINALIST - Todoist Terminal Client
 NAVIGATION
 ----------
 j/k         Navigate tasks (down/up)
-J/K         Navigate projects (down/up)
+]/[ or J/K  Navigate sidebar items (down/up)
+H/L         Collapse/expand the selected project folder
 Mouse       Click sidebar items to navigate
 Enter       Open task details or confirm action
 Esc         Cancel action or close dialogs

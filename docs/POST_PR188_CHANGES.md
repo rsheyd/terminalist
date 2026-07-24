@@ -33,7 +33,18 @@ Known follow-up:
 Validation:
 
 - `cargo fmt --all -- --check`
-- `cargo test` (99 tests passed)
+- `cargo test` (103 tests passed)
+
+### Modeless sidebar navigation
+
+- Kept the task list permanently active instead of switching focus between panes.
+- Added unshifted `]`/`[` shortcuts to move down/up through navigation items while
+  retaining `J`/`K` as alternatives.
+- Routed `H`/`L` project-folder folding without requiring sidebar focus.
+- Kept the navigation border passive and the task-list border active.
+- Updated the shortcut bar, built-in help, README, PRD, and keyboard-shortcut
+  documentation.
+- Added behavior tests for bracket and uppercase sidebar navigation.
 
 ## Future pull request outline
 

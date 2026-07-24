@@ -26,8 +26,8 @@ components.
 - Allow the divider between navigation and tasks to be resized.
 - Show task counts at the right edge of navigation rows.
 - Highlight the selected navigation row.
-- Use left and right arrows to move focus between navigation and tasks.
-- Highlight the border and title of the focused pane.
+- Keep the task list active and use `]`/`[` or `J`/`K` to move through navigation items.
+- Highlight the task-pane border while keeping the navigation-pane border passive.
 
 ### Task Visibility and Counts
 

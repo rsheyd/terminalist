@@ -116,7 +116,7 @@ Essential keyboard shortcuts to get started:
 | Key | Action |
 |-----|--------|
 | `j/k` | Navigate tasks up/down |
-| `J/K` | Navigate projects up/down |
+| `]/[` or `J/K` | Navigate sidebar items down/up |
 | `x` | Mark/unmark task for bulk actions |
 | `u` | Remove due date |
 | `Space` | Toggle task completion |
