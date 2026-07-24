@@ -92,6 +92,9 @@ Validation:
 - Changed `b` from hide/show to expanded/collapsed behavior.
 - Added a three-column collapsed rail showing `b` and an expansion chevron.
 - Made the collapsed rail clickable.
+- Moved the bracket-navigation and collapse hints into the expanded sidebar footer.
+- Muted the collapsed rail hint and task-list border to reduce visual emphasis.
+- Made the task-pane title identify its selected smart view, project, or label.
 - Persisted the last collapsed state and expanded width separately from user-authored
   configuration, then restored both on startup.
 - Preserved `sidebar_visible` and `sidebar_width` as first-run defaults for compatibility.

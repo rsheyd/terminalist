@@ -545,7 +545,7 @@ impl Component for SidebarComponent {
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .title("Projects & Labels")
-                    .title_bottom(Line::styled(" b to hide ", Style::default().fg(pane_color)).right_aligned())
+                    .title_bottom(Line::styled(" [ ] move · b hide ", Style::default().fg(pane_color)).right_aligned())
                     .title_style(Style::default().fg(pane_color))
                     .border_style(Style::default().fg(pane_color)),
             )
@@ -689,6 +689,6 @@ mod tests {
             .take(26)
             .map(|cell| cell.symbol())
             .collect::<String>();
-        assert!(bottom_row.contains("b to hide"), "bottom row: {bottom_row:?}");
+        assert!(bottom_row.contains("[ ] move · b hide"), "bottom row: {bottom_row:?}");
     }
 }

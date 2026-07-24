@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Incremental Todoist Sync** - Persist Todoist Sync API tokens and retrieve only remote changes after the initial full synchronization
 - **Smart View Bar** - Show Today, Agenda, Tomorrow, Upcoming, and Trash in an always-visible top navigation bar with keyboard and mouse navigation
 - **Persistent Sidebar Rail** - Collapse Projects & Labels to a clickable three-column rail and restore its last state and expanded width on startup
-- **Sidebar Hint** - Show `b to hide` on the expanded Projects & Labels pane
+- **Sidebar Hints** - Show `[ ] move · b hide` on the expanded Projects & Labels pane instead of duplicating sidebar navigation in the global shortcut bar
+- **Quieter Pane Chrome** - Mute the collapsed sidebar hint and task-list border so task content remains the visual focus
+- **Contextual Task Titles** - Identify the active smart view, project, or label in the task-pane title
 
 ### Changed
 - **Responsive Refreshes** - Keep navigation and read-only interactions available while post-sync data reloads finish, blocking only mutations

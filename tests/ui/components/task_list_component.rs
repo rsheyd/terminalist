@@ -25,6 +25,17 @@ fn project() -> project::Model {
     }
 }
 
+fn label(name: &str) -> label::Model {
+    label::Model {
+        uuid: Uuid::new_v4(),
+        backend_uuid: Uuid::new_v4(),
+        remote_id: name.to_string(),
+        name: name.to_string(),
+        order_index: 0,
+        is_favorite: false,
+    }
+}
+
 fn task(content: &str, project_uuid: Uuid, is_completed: bool) -> task::Model {
     task::Model {
         uuid: Uuid::new_v4(),
@@ -66,6 +77,50 @@ fn component_with_tasks(tasks: Vec<task::Model>, project: project::Model) -> Tas
 fn test_task_list_component_creation() {
     // Test that TaskListComponent can be created without panicking
     let _task_list = TaskListComponent::new();
+}
+
+#[test]
+fn task_pane_title_identifies_the_selected_view_project_or_label() {
+    let backend = TestBackend::new(80, 6);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut component = TaskListComponent::new();
+
+    terminal.draw(|frame| component.render(frame, frame.area())).unwrap();
+    assert!(terminal.backend().buffer().content[..80]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>()
+        .contains("Tasks — Today"));
+
+    let project = project();
+    component.update_data(
+        Vec::new(),
+        Vec::new(),
+        vec![project.clone()],
+        Vec::new(),
+        SidebarSelection::Project(project.uuid),
+    );
+    terminal.draw(|frame| component.render(frame, frame.area())).unwrap();
+    assert!(terminal.backend().buffer().content[..80]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>()
+        .contains("Tasks — Test"));
+
+    let label = label("Work");
+    component.update_data(
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        vec![label.clone()],
+        SidebarSelection::Label(label.uuid),
+    );
+    terminal.draw(|frame| component.render(frame, frame.area())).unwrap();
+    assert!(terminal.backend().buffer().content[..80]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>()
+        .contains("Tasks — @Work"));
 }
 
 #[test]

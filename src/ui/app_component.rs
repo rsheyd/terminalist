@@ -1400,16 +1400,13 @@ impl AppComponent {
     fn render_collapsed_sidebar_rail(f: &mut Frame, rect: Rect) {
         use ratatui::{
             layout::Alignment,
-            style::{Color, Modifier, Style},
+            style::{Color, Style},
             text::{Line, Span},
             widgets::{Block, BorderType, Borders, Paragraph},
         };
 
         let content = Paragraph::new(vec![
-            Line::from(Span::styled(
-                "b",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            )),
+            Line::from(Span::styled("b", Style::default().fg(Color::DarkGray))),
             Line::from(Span::styled("»", Style::default().fg(Color::DarkGray))),
         ])
         .alignment(Alignment::Center)
@@ -1432,7 +1429,7 @@ impl AppComponent {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title("Smart views  ←/→")
+            .title("Smart Views  ←/→")
             .border_style(Style::default().fg(Color::DarkGray));
         f.render_widget(block, rect);
 
@@ -1451,7 +1448,6 @@ impl AppComponent {
         if selection == &SidebarSelection::Trash {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("d", "restore"),
@@ -1464,7 +1460,6 @@ impl AppComponent {
         } else if selection == &SidebarSelection::Agenda {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("Space", "toggle complete"),
                 ("s", "set time"),
@@ -1476,7 +1471,6 @@ impl AppComponent {
         } else {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("Space", "toggle complete"),
@@ -1615,6 +1609,7 @@ mod tests {
 
         assert!(shortcuts.contains(&("d", "restore")));
         assert!(shortcuts.contains(&("D", "empty trash")));
+        assert!(!shortcuts.iter().any(|(_, label)| *label == "sidebar"));
         assert!(!shortcuts
             .iter()
             .any(|(_, label)| ["toggle complete", "add", "today"].contains(label)));
@@ -1703,6 +1698,26 @@ mod tests {
         assert!(!app.sidebar_collapsed);
         storage.lock().await.conn.clone().close().await.unwrap();
         std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[test]
+    fn collapsed_sidebar_hint_is_muted() {
+        use ratatui::{
+            backend::TestBackend,
+            style::{Color, Modifier},
+            Terminal,
+        };
+
+        let backend = TestBackend::new(COLLAPSED_SIDEBAR_WIDTH, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| AppComponent::render_collapsed_sidebar_rail(frame, frame.area()))
+            .unwrap();
+
+        let hint = terminal.backend().buffer().cell((1, 1)).unwrap();
+        assert_eq!(hint.symbol(), "b");
+        assert_eq!(hint.fg, Color::DarkGray);
+        assert!(!hint.modifier.contains(Modifier::BOLD));
     }
 
     #[tokio::test]

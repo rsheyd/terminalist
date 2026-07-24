@@ -94,6 +94,37 @@ impl TaskListComponent {
         self.processing_message = message;
     }
 
+    fn view_title(&self) -> String {
+        match &self.sidebar_selection {
+            SidebarSelection::Today => "Today".to_string(),
+            SidebarSelection::Agenda => "Agenda".to_string(),
+            SidebarSelection::Tomorrow => "Tomorrow".to_string(),
+            SidebarSelection::Upcoming => "Upcoming".to_string(),
+            SidebarSelection::Trash => "Trash".to_string(),
+            SidebarSelection::Project(uuid) => self
+                .projects
+                .iter()
+                .find(|project| project.uuid == *uuid)
+                .map_or_else(|| "Project".to_string(), |project| project.name.clone()),
+            SidebarSelection::Label(uuid) => self
+                .labels
+                .iter()
+                .find(|label| label.uuid == *uuid)
+                .map_or_else(|| "Label".to_string(), |label| format!("@{}", label.name)),
+        }
+    }
+
+    fn pane_title(&self) -> String {
+        let title = format!("Tasks — {}", self.view_title());
+        if self.marked_task_ids.is_empty() {
+            self.processing_message
+                .as_ref()
+                .map_or(title.clone(), |message| format!("{title} — ⟳ {message}…"))
+        } else {
+            format!("{title} — {} selected", self.marked_task_ids.len())
+        }
+    }
+
     pub fn update_data(
         &mut self,
         tasks: Vec<task::Model>,
@@ -821,7 +852,8 @@ impl Component for TaskListComponent {
         // Calculate areas for list and scrollbar using helper
         let (list_area, scrollbar_area) = ScrollbarHelper::calculate_areas(rect, total_items);
 
-        let pane_color = Color::Cyan;
+        let title_color = Color::Cyan;
+        let border_color = Color::DarkGray;
         let empty_message = if self.items.is_empty() {
             // Show contextual empty state message
             Some(match &self.sidebar_selection {
@@ -838,15 +870,9 @@ impl Component for TaskListComponent {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title(if self.marked_task_ids.is_empty() {
-                self.processing_message
-                    .as_ref()
-                    .map_or_else(|| "Tasks".to_string(), |message| format!("Tasks — ⟳ {message}…"))
-            } else {
-                format!("Tasks — {} selected", self.marked_task_ids.len())
-            })
-            .title_style(Style::default().fg(pane_color))
-            .border_style(Style::default().fg(pane_color));
+            .title(self.pane_title())
+            .title_style(Style::default().fg(title_color))
+            .border_style(Style::default().fg(border_color));
 
         if let Some(message) = empty_message {
             let message_area = block.inner(list_area);
