@@ -129,6 +129,47 @@ pub enum Action {
 }
 
 impl Action {
+    /// Whether this action starts or confirms a remote/local data mutation.
+    ///
+    /// Blocking background work may temporarily make the displayed snapshot stale. Read-only
+    /// actions remain safe during that window, but mutations wait until the latest snapshot has
+    /// been applied.
+    pub fn is_mutation(&self) -> bool {
+        matches!(
+            self,
+            Self::ToggleTasks(_)
+                | Self::DeleteTask(_)
+                | Self::CyclePriority(_)
+                | Self::SetTaskDueToday(_)
+                | Self::SetTaskDueTomorrow(_)
+                | Self::SetTaskDueNextWeek(_)
+                | Self::SetTaskDueWeekEnd(_)
+                | Self::SetTaskDueTime { .. }
+                | Self::SetTasksDueDate { .. }
+                | Self::CreateTask { .. }
+                | Self::EditTask { .. }
+                | Self::RestoreTask(_)
+                | Self::EmptyTrash
+                | Self::CreateProject { .. }
+                | Self::EditProject { .. }
+                | Self::DeleteProject(_)
+                | Self::CreateLabel { .. }
+                | Self::EditLabel { .. }
+                | Self::DeleteLabel(_)
+                | Self::ShowDialog(
+                    DialogType::TaskCreation { .. }
+                        | DialogType::TaskEdit { .. }
+                        | DialogType::TaskTime { .. }
+                        | DialogType::ProjectCreation
+                        | DialogType::ProjectEdit { .. }
+                        | DialogType::LabelCreation
+                        | DialogType::LabelEdit { .. }
+                        | DialogType::DeleteConfirmation { .. }
+                        | DialogType::EmptyTrashConfirmation { .. }
+                )
+        )
+    }
+
     /// Build the shared completion-toggle action used by every task view.
     ///
     /// The boolean records whether the task should be restored rather than
@@ -148,6 +189,41 @@ impl Action {
 
     pub fn toggle_task(task: &task::Model) -> Self {
         Self::toggle_tasks([task])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mutation_classification_keeps_read_only_actions_available() {
+        assert!(!Action::NextTask.is_mutation());
+        assert!(!Action::NavigateToSidebar(SidebarSelection::Today).is_mutation());
+        assert!(!Action::SearchTasks("needle".to_string()).is_mutation());
+        assert!(!Action::ShowDialog(DialogType::Help).is_mutation());
+    }
+
+    #[test]
+    fn mutation_classification_includes_edit_entry_points_and_confirmations() {
+        assert!(Action::CreateTask {
+            content: "New task".to_string(),
+            project_uuid: None,
+            due_date: None,
+            label_uuid: None,
+        }
+        .is_mutation());
+        assert!(Action::ShowDialog(DialogType::TaskCreation {
+            default_project_uuid: None,
+            default_due_date: None,
+            default_label_uuid: None,
+        })
+        .is_mutation());
+        assert!(Action::ShowDialog(DialogType::DeleteConfirmation {
+            item_type: "task".to_string(),
+            item_uuid: Uuid::new_v4(),
+        })
+        .is_mutation());
     }
 }
 

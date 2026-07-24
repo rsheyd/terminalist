@@ -5,6 +5,7 @@
 
 ## File map
 
+- `src/backend/`: Backend API adapters and full/incremental sync payloads.
 - `src/sync/`: Todoist synchronization and local cache reconciliation.
 - `src/repositories/`: SQLite queries.
 - `src/ui/`: actions, navigation, dialogs, and TUI components.

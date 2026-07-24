@@ -23,6 +23,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::backend::BackendError;
+use crate::repositories::BackendRepository;
 use crate::storage::LocalStorage;
 
 /// Service that manages data synchronization between remote backends and local storage.
@@ -206,91 +208,45 @@ impl SyncService {
     async fn perform_sync(&self) -> Result<SyncStatus> {
         info!("🔄 Starting sync process...");
 
-        // Fetch projects from backend
-        let projects = match self.get_backend().await?.fetch_projects().await {
-            Ok(projects) => {
-                info!("✅ Fetched {} projects from backend", projects.len());
-                projects
+        let sync_token = self.load_sync_token().await?;
+        let backend = self.get_backend().await?;
+        let data = match backend.fetch_sync(sync_token.as_deref()).await {
+            Ok(data) => data,
+            Err(BackendError::InvalidSyncToken(message)) if sync_token.is_some() => {
+                info!("⚠️  Incremental sync token was rejected; retrying with a full sync");
+                match backend.fetch_sync(None).await {
+                    Ok(data) => data,
+                    Err(error) => {
+                        error!("❌ Full-sync recovery failed after invalid token ({message}): {error}");
+                        return Ok(SyncStatus::Error {
+                            message: format!("Full-sync recovery failed: {error}"),
+                        });
+                    }
+                }
             }
-            Err(e) => {
-                error!("❌ Failed to fetch projects: {e}");
+            Err(error) => {
+                error!("❌ Failed to fetch backend changes: {error}");
                 return Ok(SyncStatus::Error {
-                    message: format!("Failed to fetch projects: {e}"),
+                    message: format!("Failed to fetch backend changes: {error}"),
                 });
             }
         };
 
-        // Fetch all tasks from backend
-        let tasks = match self.get_backend().await?.fetch_tasks().await {
-            Ok(tasks) => {
-                info!("✅ Fetched {} tasks from backend", tasks.len());
-                tasks
-            }
-            Err(e) => {
-                error!("❌ Failed to fetch tasks: {e}");
-                return Ok(SyncStatus::Error {
-                    message: format!("Failed to fetch tasks: {e}"),
-                });
-            }
-        };
-
-        let (completed_since, completed_until) = crate::utils::datetime::today_completion_range();
-        let completed_tasks = match self
-            .get_backend()
-            .await?
-            .fetch_completed_tasks(&completed_since, &completed_until)
-            .await
-        {
-            Ok(tasks) => {
-                info!("✅ Fetched {} tasks completed today from backend", tasks.len());
-                tasks
-            }
-            Err(e) => {
-                error!("❌ Failed to fetch completed tasks: {e}");
-                return Ok(SyncStatus::Error {
-                    message: format!("Failed to fetch completed tasks: {e}"),
-                });
-            }
-        };
-
-        // Completed entries are stored first so an active occurrence wins if Todoist
-        // returns the same task ID for a recurring task's next occurrence.
-        let tasks = completed_tasks.into_iter().chain(tasks).collect::<Vec<_>>();
-
-        // Fetch all labels from backend
-        let labels = match self.get_backend().await?.fetch_labels().await {
-            Ok(labels) => {
-                info!("✅ Fetched {} labels from backend", labels.len());
-                labels
-            }
-            Err(e) => {
-                error!("❌ Failed to fetch labels: {e}");
-                return Ok(SyncStatus::Error {
-                    message: format!("Failed to fetch labels: {e}"),
-                });
-            }
-        };
-
-        // Fetch all sections from backend
-        let sections = match self.get_backend().await?.fetch_sections().await {
-            Ok(sections) => {
-                info!("✅ Fetched {} sections from backend", sections.len());
-                sections
-            }
-            Err(e) => {
-                error!("❌ Failed to fetch sections: {e}");
-                info!("⚠️  Skipping sections sync due to backend compatibility issue");
-                // For now, skip sections sync and continue with other data
-                Vec::new()
-            }
-        };
+        info!(
+            "✅ Fetched {} sync: {} projects, {} tasks, {} labels, {} sections",
+            if data.full_sync { "full" } else { "incremental" },
+            data.projects.len(),
+            data.tasks.len(),
+            data.labels.len(),
+            data.sections.len()
+        );
 
         // Store in local database
         {
             let storage = self.storage.lock().await;
             info!("💾 Storing data in local database...");
 
-            if let Err(e) = self.store_snapshot(&storage, &projects, &labels, &sections, &tasks).await {
+            if let Err(e) = self.store_sync_data(&storage, &data).await {
                 error!("❌ Failed to refresh local cache: {e:#}");
                 return Ok(SyncStatus::Error {
                     message: format!("Failed to refresh local cache: {e:#}"),
@@ -300,6 +256,16 @@ impl SyncService {
         }
 
         Ok(SyncStatus::Success)
+    }
+
+    async fn load_sync_token(&self) -> Result<Option<String>> {
+        let storage = self.storage.lock().await;
+        let backend = BackendRepository::get_by_uuid(&storage.conn, &self.backend_uuid).await?;
+        Ok(backend.and_then(|backend| {
+            serde_json::from_str::<serde_json::Value>(&backend.settings)
+                .ok()
+                .and_then(|settings| settings.get("sync_token")?.as_str().map(str::to_string))
+        }))
     }
 
     /// Forces a full synchronization with the remote backend, bypassing any checks (e.g., last sync time).

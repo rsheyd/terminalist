@@ -1120,14 +1120,6 @@ impl AppComponent {
                 if self.dialog.is_visible() {
                     // Dialog has priority when visible
                     self.dialog.handle_key_events(key)
-                } else if self.task_manager.has_blocking_work() {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Char('?') | KeyCode::Char('h') => self.handle_global_key(key),
-                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            self.handle_global_key(key)
-                        }
-                        _ => Action::None,
-                    }
                 } else {
                     let component_action = match key.code {
                         KeyCode::Char('J')
@@ -1161,6 +1153,20 @@ impl AppComponent {
                 Action::None
             }
             EventType::Other => Action::None,
+        };
+
+        let action = if self.task_manager.has_blocking_work() && action.is_mutation() {
+            if self.dialog.is_visible() {
+                // Keep any in-progress draft intact; the existing refresh indicator explains
+                // why submission is temporarily unavailable.
+                Action::None
+            } else {
+                Action::ShowDialog(DialogType::Info(
+                    "Finishing data refresh. Navigation and other read-only actions are still available.".to_string(),
+                ))
+            }
+        } else {
+            action
         };
 
         // Process action through component hierarchy

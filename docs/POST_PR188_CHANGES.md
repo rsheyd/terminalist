@@ -1,6 +1,6 @@
 # Post-PR #188 Branch Changes
 
-Last updated: July 23, 2026
+Last updated: July 24, 2026
 
 ## Purpose
 
@@ -45,6 +45,28 @@ Validation:
 - Updated the shortcut bar, built-in help, README, PRD, and keyboard-shortcut
   documentation.
 - Added behavior tests for bracket and uppercase sidebar navigation.
+
+### Responsive and incremental Todoist synchronization
+
+- Kept navigation, scrolling, search, task details, help, and quit responsive while
+  post-sync data loads are in progress.
+- Blocked only mutations while a potentially stale snapshot is loading, including task,
+  project, and label creation, edits, completion, deletion, restoration, scheduling, and
+  their confirmation dialogs.
+- Preserved in-progress dialog drafts when submission is temporarily blocked.
+- Replaced repeated full task-list downloads with Todoist's incremental Sync API.
+- Persisted each Todoist sync token in backend settings and advanced it in the same SQLite
+  transaction as the corresponding cache changes.
+- Added automatic full-sync recovery when Todoist rejects a stored sync token.
+- Kept locally tombstoned tasks when a remote deletion delta for the same task arrives.
+- Added tests for mutation classification, sparse deletion tombstones, completion and
+  recurrence conversion, incremental updates and deletions, settings preservation, and
+  transactional token rollback.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test` (109 tests passed)
 
 ## Future pull request outline
 

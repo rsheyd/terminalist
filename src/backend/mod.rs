@@ -24,6 +24,9 @@ pub enum BackendError {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
+    #[error("Incremental sync token is invalid: {0}")]
+    InvalidSyncToken(String),
+
     #[error("Backend error: {0}")]
     Other(String),
 }
@@ -76,6 +79,21 @@ pub struct BackendSection {
     pub name: String,
     pub project_remote_id: String,
     pub order_index: i32,
+}
+
+/// A full or incremental set of backend changes.
+#[derive(Clone, Debug, Default)]
+pub struct BackendSyncData {
+    pub full_sync: bool,
+    pub sync_token: Option<String>,
+    pub projects: Vec<BackendProject>,
+    pub tasks: Vec<BackendTask>,
+    pub labels: Vec<BackendLabel>,
+    pub sections: Vec<BackendSection>,
+    pub deleted_project_ids: Vec<String>,
+    pub deleted_task_ids: Vec<String>,
+    pub deleted_label_ids: Vec<String>,
+    pub deleted_section_ids: Vec<String>,
 }
 
 /// Arguments for creating a new project.
@@ -154,6 +172,21 @@ pub trait Backend: Send + Sync {
     async fn fetch_completed_tasks(&self, since: &str, until: &str) -> Result<Vec<BackendTask>, BackendError>;
     async fn fetch_labels(&self) -> Result<Vec<BackendLabel>, BackendError>;
     async fn fetch_sections(&self) -> Result<Vec<BackendSection>, BackendError>;
+
+    /// Fetch a full snapshot or changes since `sync_token`.
+    ///
+    /// Backends without native incremental sync may ignore the token and return a full snapshot.
+    async fn fetch_sync(&self, sync_token: Option<&str>) -> Result<BackendSyncData, BackendError> {
+        let _ = sync_token;
+        Ok(BackendSyncData {
+            full_sync: true,
+            projects: self.fetch_projects().await?,
+            tasks: self.fetch_tasks().await?,
+            labels: self.fetch_labels().await?,
+            sections: self.fetch_sections().await?,
+            ..BackendSyncData::default()
+        })
+    }
 
     // CRUD operations for projects
     async fn create_project(&self, args: CreateProjectArgs) -> Result<BackendProject, BackendError>;

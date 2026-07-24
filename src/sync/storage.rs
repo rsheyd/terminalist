@@ -1,9 +1,13 @@
+use crate::backend::BackendSyncData;
 use crate::entities::{label, project, section, task, task_label};
-use crate::repositories::{LabelRepository, ProjectRepository, SectionRepository, TaskRepository};
+use crate::repositories::{BackendRepository, LabelRepository, ProjectRepository, SectionRepository, TaskRepository};
 use crate::storage::LocalStorage;
 use crate::sync::SyncService;
 use anyhow::{Context, Result};
-use sea_orm::{ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    TransactionTrait,
+};
 use uuid::Uuid;
 
 impl SyncService {
@@ -11,6 +15,7 @@ impl SyncService {
     ///
     /// Fetching happens before this method is called. If any write fails, the transaction
     /// rolls back and the last valid cache remains available to the UI.
+    #[cfg(test)]
     pub(super) async fn store_snapshot(
         &self,
         storage: &LocalStorage,
@@ -19,34 +24,125 @@ impl SyncService {
         sections: &[crate::backend::BackendSection],
         tasks: &[crate::backend::BackendTask],
     ) -> Result<()> {
+        self.store_sync_data(
+            storage,
+            &BackendSyncData {
+                full_sync: true,
+                projects: projects.to_vec(),
+                tasks: tasks.to_vec(),
+                labels: labels.to_vec(),
+                sections: sections.to_vec(),
+                ..BackendSyncData::default()
+            },
+        )
+        .await
+    }
+
+    /// Atomically apply backend changes and advance the incremental sync token.
+    pub(super) async fn store_sync_data(&self, storage: &LocalStorage, data: &BackendSyncData) -> Result<()> {
         let transaction = storage
             .conn
             .begin()
             .await
             .context("Failed to start cache refresh transaction")?;
 
-        self.store_projects_batch(&transaction, projects)
+        if !data.full_sync {
+            self.apply_remote_deletions(&transaction, data)
+                .await
+                .context("Failed to apply remote deletions")?;
+        }
+
+        self.store_projects_batch(&transaction, &data.projects)
             .await
             .context("Failed to store projects")?;
-        self.store_labels_batch(&transaction, labels)
+        self.store_labels_batch(&transaction, &data.labels)
             .await
             .context("Failed to store labels")?;
-        if !sections.is_empty() {
-            self.store_sections_batch(&transaction, sections)
+        if !data.sections.is_empty() {
+            self.store_sections_batch(&transaction, &data.sections)
                 .await
                 .context("Failed to store sections")?;
         }
-        self.store_tasks_batch(&transaction, tasks)
+        self.store_tasks_batch(&transaction, &data.tasks)
             .await
             .context("Failed to store tasks")?;
-        self.remove_tasks_absent_from_snapshot(&transaction, tasks)
-            .await
-            .context("Failed to remove stale tasks")?;
+        if data.full_sync {
+            self.remove_tasks_absent_from_snapshot(&transaction, &data.tasks)
+                .await
+                .context("Failed to remove stale tasks")?;
+        } else {
+            self.purge_expired_trash(&transaction).await?;
+        }
+
+        if let Some(sync_token) = &data.sync_token {
+            self.store_sync_token(&transaction, sync_token)
+                .await
+                .context("Failed to store incremental sync token")?;
+        }
 
         transaction
             .commit()
             .await
             .context("Failed to commit cache refresh transaction")?;
+        Ok(())
+    }
+
+    async fn apply_remote_deletions<C>(&self, conn: &C, data: &BackendSyncData) -> Result<()>
+    where
+        C: ConnectionTrait,
+    {
+        if !data.deleted_task_ids.is_empty() {
+            task::Entity::delete_many()
+                .filter(task::Column::BackendUuid.eq(self.backend_uuid))
+                .filter(task::Column::IsDeleted.eq(false))
+                .filter(task::Column::RemoteId.is_in(data.deleted_task_ids.clone()))
+                .exec(conn)
+                .await?;
+        }
+        if !data.deleted_section_ids.is_empty() {
+            section::Entity::delete_many()
+                .filter(section::Column::BackendUuid.eq(self.backend_uuid))
+                .filter(section::Column::RemoteId.is_in(data.deleted_section_ids.clone()))
+                .exec(conn)
+                .await?;
+        }
+        if !data.deleted_label_ids.is_empty() {
+            label::Entity::delete_many()
+                .filter(label::Column::BackendUuid.eq(self.backend_uuid))
+                .filter(label::Column::RemoteId.is_in(data.deleted_label_ids.clone()))
+                .exec(conn)
+                .await?;
+        }
+        if !data.deleted_project_ids.is_empty() {
+            project::Entity::delete_many()
+                .filter(project::Column::BackendUuid.eq(self.backend_uuid))
+                .filter(project::Column::RemoteId.is_in(data.deleted_project_ids.clone()))
+                .exec(conn)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn store_sync_token<C>(&self, conn: &C, sync_token: &str) -> Result<()>
+    where
+        C: ConnectionTrait,
+    {
+        let model = BackendRepository::get_by_uuid(conn, &self.backend_uuid)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Backend {} not found while saving sync token", self.backend_uuid))?;
+        let mut settings =
+            serde_json::from_str::<serde_json::Value>(&model.settings).unwrap_or_else(|_| serde_json::json!({}));
+        let object = settings
+            .as_object_mut()
+            .ok_or_else(|| anyhow::anyhow!("Backend settings must be a JSON object"))?;
+        object.insert(
+            "sync_token".to_string(),
+            serde_json::Value::String(sync_token.to_string()),
+        );
+
+        let mut active = model.into_active_model();
+        active.settings = ActiveValue::Set(serde_json::to_string(&settings)?);
+        active.update(conn).await?;
         Ok(())
     }
 
@@ -66,6 +162,14 @@ impl SyncService {
         }
         delete.exec(conn).await?;
 
+        self.purge_expired_trash(conn).await?;
+        Ok(())
+    }
+
+    async fn purge_expired_trash<C>(&self, conn: &C) -> Result<()>
+    where
+        C: ConnectionTrait,
+    {
         let trash_cutoff = (chrono::Utc::now() - chrono::Duration::days(30)).to_rfc3339();
         task::Entity::delete_many()
             .filter(task::Column::BackendUuid.eq(self.backend_uuid))
@@ -463,7 +567,7 @@ impl SyncService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backend::{BackendProject, BackendSection, BackendTask};
+    use crate::backend::{BackendProject, BackendSection, BackendSyncData, BackendTask};
     use crate::backend_registry::BackendRegistry;
     use crate::entities::backend;
     use sea_orm::{DbBackend, EntityTrait, Set, Statement};
@@ -796,6 +900,155 @@ mod tests {
             .await
             .unwrap();
             assert!(next_day.is_empty());
+        }
+
+        storage.lock().await.conn.clone().close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn incremental_sync_changes_only_named_tasks_and_advances_token() {
+        let db_path = std::env::temp_dir().join(format!("terminalist-delta-{}.db", Uuid::new_v4()));
+        let storage = LocalStorage::new_at(db_path.clone()).await.unwrap();
+        let backend_uuid = Uuid::new_v4();
+        backend::Entity::insert(backend::ActiveModel {
+            uuid: Set(backend_uuid),
+            backend_type: Set("test".to_string()),
+            name: Set("Test".to_string()),
+            is_enabled: Set(true),
+            credentials: Set("{}".to_string()),
+            settings: Set(r#"{"theme":"dark","sync_token":"old-token"}"#.to_string()),
+        })
+        .exec(&storage.conn)
+        .await
+        .unwrap();
+
+        let storage = Arc::new(Mutex::new(storage));
+        let service = SyncService::new_for_test(storage.clone(), backend_uuid);
+        let project = BackendProject {
+            remote_id: "inbox".to_string(),
+            name: "Inbox".to_string(),
+            is_favorite: false,
+            is_inbox: true,
+            order_index: 0,
+            parent_remote_id: None,
+        };
+        let unchanged = backend_task("unchanged", "inbox");
+        let mut changed = backend_task("changed", "inbox");
+        let remote_deleted = backend_task("remote-deleted", "inbox");
+        let locally_deleted = backend_task("locally-deleted", "inbox");
+
+        {
+            let storage = storage.lock().await;
+            service
+                .store_snapshot(
+                    &storage,
+                    std::slice::from_ref(&project),
+                    &[],
+                    &[],
+                    &[unchanged, changed.clone(), remote_deleted, locally_deleted],
+                )
+                .await
+                .unwrap();
+            task::Entity::update_many()
+                .col_expr(task::Column::IsDeleted, sea_orm::sea_query::Expr::value(true))
+                .col_expr(
+                    task::Column::DeletedAt,
+                    sea_orm::sea_query::Expr::value(chrono::Utc::now().to_rfc3339()),
+                )
+                .filter(task::Column::RemoteId.eq("locally-deleted"))
+                .exec(&storage.conn)
+                .await
+                .unwrap();
+
+            changed.content = "Changed remotely".to_string();
+            service
+                .store_sync_data(
+                    &storage,
+                    &BackendSyncData {
+                        sync_token: Some("new-token".to_string()),
+                        tasks: vec![changed],
+                        deleted_task_ids: vec!["remote-deleted".to_string(), "locally-deleted".to_string()],
+                        ..BackendSyncData::default()
+                    },
+                )
+                .await
+                .unwrap();
+
+            let tasks = TaskRepository::get_all(&storage.conn).await.unwrap();
+            assert_eq!(tasks.len(), 3);
+            assert_eq!(
+                tasks.iter().find(|task| task.remote_id == "changed").unwrap().content,
+                "Changed remotely"
+            );
+            assert!(tasks.iter().any(|task| task.remote_id == "unchanged"));
+            assert!(!tasks.iter().any(|task| task.remote_id == "remote-deleted"));
+            assert!(
+                tasks
+                    .iter()
+                    .find(|task| task.remote_id == "locally-deleted")
+                    .unwrap()
+                    .is_deleted
+            );
+
+            let backend = BackendRepository::get_by_uuid(&storage.conn, &backend_uuid)
+                .await
+                .unwrap()
+                .unwrap();
+            let settings: serde_json::Value = serde_json::from_str(&backend.settings).unwrap();
+            assert_eq!(settings["sync_token"], "new-token");
+            assert_eq!(settings["theme"], "dark");
+        }
+
+        storage.lock().await.conn.clone().close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_incremental_write_keeps_previous_data_and_token() {
+        let db_path = std::env::temp_dir().join(format!("terminalist-delta-rollback-{}.db", Uuid::new_v4()));
+        let storage = LocalStorage::new_at(db_path.clone()).await.unwrap();
+        let backend_uuid = Uuid::new_v4();
+        backend::Entity::insert(backend::ActiveModel {
+            uuid: Set(backend_uuid),
+            backend_type: Set("test".to_string()),
+            name: Set("Test".to_string()),
+            is_enabled: Set(true),
+            credentials: Set("{}".to_string()),
+            settings: Set(r#"{"sync_token":"old-token"}"#.to_string()),
+        })
+        .exec(&storage.conn)
+        .await
+        .unwrap();
+
+        let storage = Arc::new(Mutex::new(storage));
+        let service = SyncService::new_for_test(storage.clone(), backend_uuid);
+        {
+            let storage = storage.lock().await;
+            let result = service
+                .store_sync_data(
+                    &storage,
+                    &BackendSyncData {
+                        sync_token: Some("new-token".to_string()),
+                        sections: vec![BackendSection {
+                            remote_id: "broken".to_string(),
+                            name: "Broken".to_string(),
+                            project_remote_id: "missing-project".to_string(),
+                            order_index: 0,
+                        }],
+                        ..BackendSyncData::default()
+                    },
+                )
+                .await;
+            assert!(result.is_err());
+
+            let backend = BackendRepository::get_by_uuid(&storage.conn, &backend_uuid)
+                .await
+                .unwrap()
+                .unwrap();
+            let settings: serde_json::Value = serde_json::from_str(&backend.settings).unwrap();
+            assert_eq!(settings["sync_token"], "old-token");
+            assert!(SectionRepository::get_all(&storage.conn).await.unwrap().is_empty());
         }
 
         storage.lock().await.conn.clone().close().await.unwrap();
