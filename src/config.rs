@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+const LEGACY_SIDEBAR_DEFAULT_WIDTH: u16 = 30;
+
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -33,6 +35,14 @@ pub struct UiConfig {
     pub sidebar_visible: bool,
     /// Show common keyboard shortcuts at the bottom of the interface
     pub shortcut_bar_visible: bool,
+}
+
+/// Last-used interface state, persisted separately from user-authored configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UiState {
+    pub sidebar_collapsed: bool,
+    pub sidebar_width: u16,
 }
 
 /// Sync configuration
@@ -78,6 +88,51 @@ impl Default for UiConfig {
             sidebar_visible: true,
             shortcut_bar_visible: true,
         }
+    }
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            sidebar_collapsed: false,
+            sidebar_width: SIDEBAR_DEFAULT_WIDTH,
+        }
+    }
+}
+
+impl UiState {
+    pub fn from_config(config: &UiConfig) -> Self {
+        Self {
+            sidebar_collapsed: !config.sidebar_visible,
+            sidebar_width: config.sidebar_width,
+        }
+    }
+
+    pub fn load_or_config<P: AsRef<Path>>(path: P, config: &UiConfig) -> Self {
+        std::fs::read_to_string(path)
+            .ok()
+            .and_then(|content| toml::from_str::<Self>(&content).ok())
+            .filter(|state| (SIDEBAR_MIN_WIDTH..=SIDEBAR_MAX_WIDTH).contains(&state.sidebar_width))
+            .map(|mut state| {
+                // Development builds persisted the former default as though it
+                // were a user-selected width. Move that default forward while
+                // leaving every other customized width untouched.
+                if state.sidebar_width == LEGACY_SIDEBAR_DEFAULT_WIDTH {
+                    state.sidebar_width = SIDEBAR_DEFAULT_WIDTH;
+                }
+                state
+            })
+            .unwrap_or_else(|| Self::from_config(config))
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        if let Some(parent) = path.as_ref().parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create UI state directory: {}", parent.display()))?;
+        }
+        let content = toml::to_string_pretty(self).context("Failed to serialize UI state")?;
+        std::fs::write(&path, content)
+            .with_context(|| format!("Failed to write UI state file: {}", path.as_ref().display()))
     }
 }
 
@@ -217,5 +272,9 @@ impl Config {
     /// Get the default config file path
     pub fn get_default_config_path() -> Result<PathBuf> {
         Ok(Self::get_xdg_config_dir()?.join("config.toml"))
+    }
+
+    pub fn get_ui_state_path() -> Result<PathBuf> {
+        Ok(Self::get_xdg_config_dir()?.join("ui-state.toml"))
     }
 }

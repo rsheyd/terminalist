@@ -25,7 +25,8 @@ This creates a config file at `~/.config/terminalist/config.toml` with all avail
 [ui]
 default_project = "today"         # Options: "inbox", "today", "tomorrow", "upcoming", project ID, or project name
 mouse_enabled = true              # Enable mouse support
-sidebar_width = 30                # Sidebar width in columns (15-50)
+sidebar_width = 26                # Sidebar width in columns (15-50)
+sidebar_visible = true            # Initial state before a last-used layout has been saved
 shortcut_bar_visible = true       # Show common keyboard shortcuts along the bottom
 
 [sync]
@@ -49,6 +50,9 @@ enabled = false                   # Enable logging to file
   - Options: `"inbox"`, `"today"`, `"tomorrow"`, `"upcoming"`, a specific project ID, or project name
 - **mouse_enabled**: Enable or disable mouse support
 - **sidebar_width**: Width of the sidebar in columns (must be between 15-50)
+- **sidebar_visible**: Initial sidebar state. After the first layout change, Terminalist
+  restores the last expanded/collapsed state and expanded width from
+  `~/.config/terminalist/ui-state.toml`.
 - **shortcut_bar_visible**: Show or hide the common keyboard-shortcut bar at the bottom
 
 ### Sync Configuration

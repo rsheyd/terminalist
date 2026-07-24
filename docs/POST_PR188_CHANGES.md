@@ -68,6 +68,40 @@ Validation:
 - `cargo fmt --all -- --check`
 - `cargo test` (109 tests passed)
 
+### Smart-view top navigation
+
+- Added an always-visible top bar for Today, Agenda, Tomorrow, Upcoming, and Trash.
+- Added wrapping Left/Right keyboard navigation between smart views.
+- Added mouse selection for every smart-view tab.
+- Kept Trash selected when it is empty instead of automatically returning to Today.
+- Kept the sidebar for projects and labels, including hierarchy folding and existing
+  ]/[ and J/K navigation.
+- Kept arrow keys owned by open dialogs for cursor movement and dialog-specific controls.
+- Updated the shortcut bar, built-in help, README, PRD, and keyboard-shortcut documentation.
+- Added focused tests for keyboard cycling, mouse selection, and project/label-only sidebar
+  behavior.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test` (113 tests passed)
+
+### Persistent Projects & Labels rail
+
+- Renamed the expanded sidebar to Projects & Labels.
+- Changed `b` from hide/show to expanded/collapsed behavior.
+- Added a three-column collapsed rail showing `b` and an expansion chevron.
+- Made the collapsed rail clickable.
+- Persisted the last collapsed state and expanded width separately from user-authored
+  configuration, then restored both on startup.
+- Preserved `sidebar_visible` and `sidebar_width` as first-run defaults for compatibility.
+- Updated configuration, shortcut, README, changelog, and built-in help documentation.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test` (115 tests passed)
+
 ## Future pull request outline
 
 Suggested title:

@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, UiState};
 use crate::constants::*;
 use crate::entities::{label, project, section, task};
 use crate::sync::{SyncService, SyncStatus};
@@ -20,6 +20,9 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 use uuid::Uuid;
+
+const SMART_VIEW_BAR_HEIGHT: u16 = 3;
+const COLLAPSED_SIDEBAR_WIDTH: u16 = 3;
 
 /// Application state separate from UI concerns
 #[derive(Debug, Clone, Default)]
@@ -91,21 +94,33 @@ pub struct AppComponent {
     latest_applied_generation: u64,
 
     // Layout state
-    sidebar_visible: bool,
+    sidebar_collapsed: bool,
     sidebar_width: u16,
     sidebar_width_override: Option<u16>,
     resizing_sidebar: bool,
+    ui_state_path: Option<std::path::PathBuf>,
     screen_width: u16,
     screen_height: u16,
+    smart_view_bar_rect: Rect,
+    main_content_rect: Rect,
 }
 
 impl AppComponent {
     pub fn new(sync_service: SyncService, config: Config) -> Self {
+        let ui_state = UiState::from_config(&config.ui);
+        Self::new_with_ui_state(sync_service, config, ui_state, None)
+    }
+
+    pub(crate) fn new_with_ui_state(
+        sync_service: SyncService,
+        config: Config,
+        ui_state: UiState,
+        ui_state_path: Option<std::path::PathBuf>,
+    ) -> Self {
         let sidebar = SidebarComponent::new();
         let task_list = TaskListComponent::new();
         let (task_manager, background_action_rx) = TaskManager::new();
-        let sidebar_width_override =
-            (config.ui.sidebar_width != SIDEBAR_DEFAULT_WIDTH).then_some(config.ui.sidebar_width);
+        let sidebar_width_override = Some(ui_state.sidebar_width);
 
         let state = AppState {
             loading: true,
@@ -120,7 +135,7 @@ impl AppComponent {
             sync_service,
             task_manager,
             background_action_rx,
-            sidebar_visible: config.ui.sidebar_visible,
+            sidebar_collapsed: ui_state.sidebar_collapsed,
             config,
             should_quit: false,
             active_sync_task: None,
@@ -128,11 +143,14 @@ impl AppComponent {
             next_load_generation: 1,
             latest_requested_generation: 0,
             latest_applied_generation: 0,
-            sidebar_width: 30, // Default width
+            sidebar_width: SIDEBAR_DEFAULT_WIDTH,
             sidebar_width_override,
             resizing_sidebar: false,
+            ui_state_path,
             screen_width: 100, // Default width
             screen_height: 50, // Default height
+            smart_view_bar_rect: Rect::default(),
+            main_content_rect: Rect::default(),
         }
     }
 
@@ -268,6 +286,16 @@ impl AppComponent {
         }
 
         match key.code {
+            KeyCode::Left => {
+                let selection = Self::adjacent_smart_view(&self.state.sidebar_selection, false);
+                info!("Global key: Left - switching to previous smart view");
+                Action::NavigateToSidebar(selection)
+            }
+            KeyCode::Right => {
+                let selection = Self::adjacent_smart_view(&self.state.sidebar_selection, true);
+                info!("Global key: Right - switching to next smart view");
+                Action::NavigateToSidebar(selection)
+            }
             KeyCode::Char('b') => {
                 info!("Global key: 'b' - toggling sidebar visibility");
                 Action::ToggleSidebar
@@ -465,7 +493,8 @@ impl AppComponent {
     pub async fn handle_app_action(&mut self, action: Action) -> Action {
         match action {
             Action::ToggleSidebar => {
-                self.sidebar_visible = !self.sidebar_visible;
+                self.sidebar_collapsed = !self.sidebar_collapsed;
+                self.persist_ui_state();
                 Action::None
             }
             Action::Quit => {
@@ -860,17 +889,10 @@ impl AppComponent {
                     snapshot.tasks.len()
                 );
                 let was_initial = snapshot.is_initial;
-                let trash_became_empty =
-                    snapshot.selection == SidebarSelection::Trash && snapshot.navigation_counts.trash == 0;
                 self.apply_snapshot(*snapshot);
-                if trash_became_empty {
-                    self.state.sidebar_selection = SidebarSelection::Today;
-                }
                 self.sync_component_data();
                 if was_initial {
                     self.set_initial_sidebar_selection();
-                    self.schedule_data_fetch();
-                } else if trash_became_empty {
                     self.schedule_data_fetch();
                 }
                 Action::None
@@ -1090,9 +1112,14 @@ impl AppComponent {
                         }
                         if matches!(mouse.kind, crossterm::event::MouseEventKind::Up(_)) {
                             self.resizing_sidebar = false;
+                            self.persist_ui_state();
                         }
                         Action::None
-                    } else if self.sidebar_visible
+                    } else if self.smart_view_bar_rect.contains((mouse.column, mouse.row).into()) {
+                        Self::handle_smart_view_mouse(mouse, self.smart_view_bar_rect)
+                    } else if !self.sidebar_collapsed
+                        && mouse.row >= self.main_content_rect.y
+                        && mouse.row < self.main_content_rect.bottom()
                         && mouse.column.abs_diff(self.sidebar_width) <= 1
                         && matches!(
                             mouse.kind,
@@ -1101,14 +1128,41 @@ impl AppComponent {
                     {
                         self.resizing_sidebar = true;
                         Action::None
-                    } else if self.sidebar_visible && mouse.column < self.sidebar_width {
+                    } else if self.sidebar_collapsed
+                        && mouse.column < self.sidebar_width
+                        && mouse.row >= self.main_content_rect.y
+                        && mouse.row < self.main_content_rect.bottom()
+                    {
+                        if matches!(
+                            mouse.kind,
+                            crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
+                        ) {
+                            Action::ToggleSidebar
+                        } else {
+                            Action::None
+                        }
+                    } else if !self.sidebar_collapsed
+                        && mouse.column < self.sidebar_width
+                        && mouse.row >= self.main_content_rect.y
+                        && mouse.row < self.main_content_rect.bottom()
+                    {
                         // Mouse is in sidebar area
-                        let sidebar_area = Rect::new(0, 0, self.sidebar_width, self.screen_height);
+                        let sidebar_area = Rect::new(
+                            self.main_content_rect.x,
+                            self.main_content_rect.y,
+                            self.sidebar_width,
+                            self.main_content_rect.height,
+                        );
                         self.sidebar.handle_mouse(mouse, sidebar_area)
                     } else {
                         // Mouse is in task list area - calculate proper width
                         let task_list_width = self.screen_width.saturating_sub(self.sidebar_width).max(1);
-                        let task_list_area = Rect::new(self.sidebar_width, 0, task_list_width, self.screen_height);
+                        let task_list_area = Rect::new(
+                            self.sidebar_width,
+                            self.main_content_rect.y,
+                            task_list_width,
+                            self.main_content_rect.height,
+                        );
                         self.task_list.handle_mouse(mouse, task_list_area)
                     }
                 } else {
@@ -1185,6 +1239,77 @@ impl AppComponent {
 }
 
 impl AppComponent {
+    fn persist_ui_state(&self) {
+        let Some(path) = &self.ui_state_path else {
+            return;
+        };
+        let state = UiState {
+            sidebar_collapsed: self.sidebar_collapsed,
+            sidebar_width: self.sidebar_width_override.unwrap_or(SIDEBAR_DEFAULT_WIDTH),
+        };
+        if let Err(error) = state.save(path) {
+            log::warn!("Failed to persist UI state: {error:#}");
+        }
+    }
+
+    fn smart_views() -> [SidebarSelection; 5] {
+        [
+            SidebarSelection::Today,
+            SidebarSelection::Agenda,
+            SidebarSelection::Tomorrow,
+            SidebarSelection::Upcoming,
+            SidebarSelection::Trash,
+        ]
+    }
+
+    fn adjacent_smart_view(selection: &SidebarSelection, forward: bool) -> SidebarSelection {
+        let views = Self::smart_views();
+        let current = views.iter().position(|view| view == selection);
+        let index = match (current, forward) {
+            (Some(index), true) => (index + 1) % views.len(),
+            (Some(index), false) => (index + views.len() - 1) % views.len(),
+            (None, true) => 0,
+            (None, false) => views.len() - 1,
+        };
+        views[index].clone()
+    }
+
+    fn smart_view_rects(area: Rect) -> Vec<Rect> {
+        if area.width < 2 || area.height < 2 {
+            return Vec::new();
+        }
+        let inner = Rect::new(
+            area.x.saturating_add(1),
+            area.y.saturating_add(1),
+            area.width.saturating_sub(2),
+            area.height.saturating_sub(2),
+        );
+        Layout::horizontal([
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+        ])
+        .split(inner)
+        .to_vec()
+    }
+
+    fn handle_smart_view_mouse(mouse: crossterm::event::MouseEvent, area: Rect) -> Action {
+        if !matches!(
+            mouse.kind,
+            crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left)
+        ) {
+            return Action::None;
+        }
+        Self::smart_view_rects(area)
+            .iter()
+            .position(|rect| rect.contains((mouse.column, mouse.row).into()))
+            .map_or(Action::None, |index| {
+                Action::NavigateToSidebar(Self::smart_views()[index].clone())
+            })
+    }
+
     /// Calculate sidebar width based on configured columns
     fn calculate_sidebar_width(&self, screen_width: u16) -> u16 {
         let sidebar_columns = self.sidebar_width_override.unwrap_or_else(|| self.sidebar.preferred_width());
@@ -1210,36 +1335,53 @@ impl Component for AppComponent {
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
         let page_chunks = if self.config.ui.shortcut_bar_visible {
-            Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(rect)
+            Layout::vertical([
+                Constraint::Length(SMART_VIEW_BAR_HEIGHT),
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ])
+            .split(rect)
         } else {
-            Layout::vertical([Constraint::Min(0), Constraint::Length(0)]).split(rect)
+            Layout::vertical([
+                Constraint::Length(SMART_VIEW_BAR_HEIGHT),
+                Constraint::Min(0),
+                Constraint::Length(0),
+            ])
+            .split(rect)
         };
-        let content_rect = page_chunks[0];
+        let smart_view_bar_rect = page_chunks[0];
+        let content_rect = page_chunks[1];
 
         // Create layout: sidebar (configurable width) | task list (remainder)
-        let sidebar_width = if self.sidebar_visible {
-            self.calculate_sidebar_width(content_rect.width)
+        let sidebar_width = if self.sidebar_collapsed {
+            COLLAPSED_SIDEBAR_WIDTH.min(content_rect.width.saturating_sub(1))
         } else {
-            0
+            self.calculate_sidebar_width(content_rect.width)
         };
 
         // Update cached dimensions for mouse event handling
         self.sidebar_width = sidebar_width;
         self.screen_width = rect.width;
         self.screen_height = rect.height;
+        self.smart_view_bar_rect = smart_view_bar_rect;
+        self.main_content_rect = content_rect;
 
         let main_chunks =
             Layout::horizontal([Constraint::Length(sidebar_width), Constraint::Min(0)]).split(content_rect);
 
+        Self::render_smart_view_bar(f, smart_view_bar_rect, &self.state.sidebar_selection);
+
         // Render components
-        if self.sidebar_visible {
+        if self.sidebar_collapsed {
+            Self::render_collapsed_sidebar_rail(f, main_chunks[0]);
+        } else {
             self.sidebar.render(f, main_chunks[0]);
         }
         self.task_list.set_processing(self.task_manager.processing_description());
         self.task_list.render(f, main_chunks[1]);
 
         if self.config.ui.shortcut_bar_visible {
-            Self::render_shortcut_bar(f, page_chunks[1], &self.state.sidebar_selection);
+            Self::render_shortcut_bar(f, page_chunks[2], &self.state.sidebar_selection);
         }
 
         // Render sync status if syncing or loading
@@ -1255,11 +1397,61 @@ impl Component for AppComponent {
 }
 
 impl AppComponent {
+    fn render_collapsed_sidebar_rail(f: &mut Frame, rect: Rect) {
+        use ratatui::{
+            layout::Alignment,
+            style::{Color, Modifier, Style},
+            text::{Line, Span},
+            widgets::{Block, BorderType, Borders, Paragraph},
+        };
+
+        let content = Paragraph::new(vec![
+            Line::from(Span::styled(
+                "b",
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled("»", Style::default().fg(Color::DarkGray))),
+        ])
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray)),
+        );
+        f.render_widget(content, rect);
+    }
+
+    fn render_smart_view_bar(f: &mut Frame, rect: Rect, selection: &SidebarSelection) {
+        use ratatui::{
+            layout::Alignment,
+            style::{Color, Modifier, Style},
+            widgets::{Block, BorderType, Borders, Paragraph},
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title("Smart views  ←/→")
+            .border_style(Style::default().fg(Color::DarkGray));
+        f.render_widget(block, rect);
+
+        let names = ["Today", "Agenda", "Tomorrow", "Upcoming", "Trash"];
+        for ((view, name), tab_rect) in Self::smart_views().iter().zip(names).zip(Self::smart_view_rects(rect)) {
+            let style = if view == selection {
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            f.render_widget(Paragraph::new(name).alignment(Alignment::Center).style(style), tab_rect);
+        }
+    }
+
     fn shortcut_bar_items(selection: &SidebarSelection) -> &'static [(&'static str, &'static str)] {
         if selection == &SidebarSelection::Trash {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "views"),
+                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("d", "restore"),
@@ -1272,7 +1464,7 @@ impl AppComponent {
         } else if selection == &SidebarSelection::Agenda {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "views"),
+                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("Space", "toggle complete"),
                 ("s", "set time"),
@@ -1284,7 +1476,7 @@ impl AppComponent {
         } else {
             &[
                 ("j/k", "navigate"),
-                ("]/[", "views"),
+                ("]/[", "sidebar"),
                 ("Enter", "details"),
                 ("x", "select"),
                 ("Space", "toggle complete"),
@@ -1428,6 +1620,91 @@ mod tests {
             .any(|(_, label)| ["toggle complete", "add", "today"].contains(label)));
     }
 
+    #[test]
+    fn arrow_navigation_cycles_smart_views_and_enters_from_sidebar() {
+        assert_eq!(
+            AppComponent::adjacent_smart_view(&SidebarSelection::Today, false),
+            SidebarSelection::Trash
+        );
+        assert_eq!(
+            AppComponent::adjacent_smart_view(&SidebarSelection::Trash, true),
+            SidebarSelection::Today
+        );
+        assert_eq!(
+            AppComponent::adjacent_smart_view(&SidebarSelection::Project(Uuid::new_v4()), true),
+            SidebarSelection::Today
+        );
+        assert_eq!(
+            AppComponent::adjacent_smart_view(&SidebarSelection::Label(Uuid::new_v4()), false),
+            SidebarSelection::Trash
+        );
+    }
+
+    #[test]
+    fn smart_view_bar_click_selects_the_clicked_view() {
+        let area = Rect::new(0, 0, 100, SMART_VIEW_BAR_HEIGHT);
+        let agenda = AppComponent::smart_view_rects(area)[1];
+        let action = AppComponent::handle_smart_view_mouse(
+            crossterm::event::MouseEvent {
+                kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+                column: agenda.x,
+                row: agenda.y,
+                modifiers: KeyModifiers::NONE,
+            },
+            area,
+        );
+
+        assert!(matches!(action, Action::NavigateToSidebar(SidebarSelection::Agenda)));
+    }
+
+    #[tokio::test]
+    async fn smart_view_bar_renders_every_view_above_the_main_content() {
+        use ratatui::{backend::TestBackend, Terminal};
+
+        let (mut app, storage, db_path) = test_app().await;
+        app.state.loading = false;
+        let backend = TestBackend::new(100, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| app.render(frame, frame.area())).unwrap();
+
+        let top_bar = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .take(100 * SMART_VIEW_BAR_HEIGHT as usize)
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        for view in ["Today", "Agenda", "Tomorrow", "Upcoming", "Trash"] {
+            assert!(top_bar.contains(view), "missing {view} in top bar: {top_bar:?}");
+        }
+
+        app.task_manager.cancel_all_tasks();
+        storage.lock().await.conn.clone().close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn clicking_collapsed_sidebar_rail_expands_it() {
+        let (mut app, storage, db_path) = test_app().await;
+        app.sidebar_collapsed = true;
+        app.sidebar_width = COLLAPSED_SIDEBAR_WIDTH;
+        app.main_content_rect = Rect::new(0, SMART_VIEW_BAR_HEIGHT, 100, 15);
+
+        app.handle_event(EventType::Mouse(crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            column: 2,
+            row: SMART_VIEW_BAR_HEIGHT + 1,
+            modifiers: KeyModifiers::NONE,
+        }))
+        .await
+        .unwrap();
+
+        assert!(!app.sidebar_collapsed);
+        storage.lock().await.conn.clone().close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
     #[tokio::test]
     async fn stale_view_snapshot_cannot_replace_the_latest_navigation_result() {
         let (mut app, storage, db_path) = test_app().await;
@@ -1471,6 +1748,25 @@ mod tests {
         assert!(matches!(follow_up, Action::ShowDialog(DialogType::Error(_))));
         assert_eq!(app.state.projects[0].name, "Still visible");
         assert_eq!(app.state.error_message.as_deref(), Some("offline"));
+        storage.lock().await.conn.clone().close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn empty_trash_snapshot_keeps_trash_selected() {
+        let (mut app, storage, db_path) = test_app().await;
+        app.latest_requested_generation = 1;
+        app.state.sidebar_selection = SidebarSelection::Trash;
+
+        app.handle_app_action(Action::DataLoaded(Box::new(snapshot(
+            1,
+            SidebarSelection::Trash,
+            Vec::new(),
+        ))))
+        .await;
+
+        assert_eq!(app.state.sidebar_selection, SidebarSelection::Trash);
+        assert!(app.state.tasks.is_empty());
         storage.lock().await.conn.clone().close().await.unwrap();
         std::fs::remove_file(db_path).unwrap();
     }

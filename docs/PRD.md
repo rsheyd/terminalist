@@ -98,7 +98,7 @@ Terminalist is a high-performance terminal user interface (TUI) application for 
 - **FR-008**: Users can view hierarchical project structure
 - **FR-009**: Users can create new projects with optional parent assignment
 - **FR-010**: Users can delete projects with confirmation dialog
-- **FR-011**: Users can navigate sidebar items using ]/[ or J/K keys (down/up)
+- **FR-011**: Users can cycle top-bar smart views with Left/Right and navigate sidebar projects or labels using ]/[ or J/K
 - **FR-012**: Projects display favorites and hierarchical relationships
 - **FR-013**: Users can switch between project and label views
 - **FR-014**: Users can create and manage project sections
@@ -392,7 +392,8 @@ Terminalist is a high-performance terminal user interface (TUI) application for 
 
 #### Navigation
 - `j/k`: Navigate tasks (down/up)
-- `]/[` or `J/K`: Navigate sidebar items (down/up)
+- `Left/Right`: Cycle smart views in the top bar
+- `]/[` or `J/K`: Navigate projects and labels in the sidebar
 
 #### Task Management
 - `Space/Enter`: Toggle task completion

@@ -116,13 +116,14 @@ Essential keyboard shortcuts to get started:
 | Key | Action |
 |-----|--------|
 | `j/k` | Navigate tasks up/down |
-| `]/[` or `J/K` | Navigate sidebar items down/up |
+| `Left/Right` | Cycle smart views in the top bar |
+| `]/[` or `J/K` | Navigate projects and labels in the sidebar |
 | `x` | Mark/unmark task for bulk actions |
 | `u` | Remove due date |
 | `Space` | Toggle task completion |
 | `a` | Create new task |
 | `/` | Search tasks |
-| `b` | Toggle sidebar |
+| `b` | Expand/collapse the Projects & Labels sidebar |
 | `r` | Sync with Todoist |
 | `?` | Show help panel |
 | `q` | Quit |

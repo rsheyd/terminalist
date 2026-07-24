@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, UiState};
 use crate::sync::SyncService;
 use crate::ui::app_component::AppComponent;
 use crate::ui::core::{Component, EventHandler, EventType};
@@ -33,7 +33,9 @@ pub async fn run_app(sync_service: SyncService, config: Config) -> anyhow::Resul
     terminal.show_cursor()?;
 
     // Initialize application components
-    let mut app = AppComponent::new(sync_service, config.clone());
+    let ui_state_path = Config::get_ui_state_path()?;
+    let ui_state = UiState::load_or_config(&ui_state_path, &config.ui);
+    let mut app = AppComponent::new_with_ui_state(sync_service, config.clone(), ui_state, Some(ui_state_path));
     let mut event_handler = EventHandler::new();
 
     // Start initial sync automatically

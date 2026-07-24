@@ -87,7 +87,7 @@ pub const UPCOMING_DATE_FORMAT: &str = "📊 {} - {}";
 // UI Layout Constants (width in columns)
 pub const SIDEBAR_MIN_WIDTH: u16 = 15;
 pub const SIDEBAR_MAX_WIDTH: u16 = 50;
-pub const SIDEBAR_DEFAULT_WIDTH: u16 = 30;
+pub const SIDEBAR_DEFAULT_WIDTH: u16 = 26;
 pub const MAIN_AREA_MIN_WIDTH: u16 = 20;
 
 pub const MEMORY_LOGS_LIMIT: usize = 5000;

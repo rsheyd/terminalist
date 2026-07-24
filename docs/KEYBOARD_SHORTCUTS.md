@@ -5,9 +5,10 @@ This document lists all available keyboard shortcuts and TUI controls.
 ## Navigation
 
 - **`j/k`** Navigate between tasks (down/up)
-- **`]/[`** or **`J/K`** Navigate between navigation items (down/up)
+- **`Left/Right`** Cycle through smart views in the top navigation bar
+- **`]/[`** or **`J/K`** Navigate between projects and labels in the sidebar (down/up)
 - **`H/L`** Collapse/expand the selected project folder
-- **Mouse** Click on sidebar items to navigate
+- **Mouse** Click smart views, projects, or labels to navigate
 
 The task list is always the active pane. Navigation shortcuts change the
 selected view without moving keyboard focus away from the task list.
@@ -37,7 +38,7 @@ currently highlighted task.
 
 ## System
 
-- **`b`** Toggle sidebar visibility
+- **`b`** Expand or collapse the Projects & Labels sidebar
 - **`/`** Open task search dialog (search across all tasks)
 - **`r`** Force sync with Todoist
 - **`D`** Empty Trash while the Trash view is selected (with confirmation)
@@ -68,10 +69,13 @@ currently highlighted task.
 ## Interface Layout
 
 ### Layout Structure
-- **Main Area**: Projects list (sidebar) | Tasks list (main area) - side by side
+- **Top Bar**: Today, Agenda, Tomorrow, Upcoming, and Trash smart views
+- **Main Area**: Projects and labels (sidebar) | Tasks list (main area) - side by side
 
 ### Components
-- **Projects List (Left)**: Hierarchical display of all Todoist projects
+- **Smart Views (Top)**: Always-visible smart-view navigation; use Left/Right or click a view
+- **Projects & Labels (Left)**: Hierarchical projects and labels; collapses to a
+  three-column rail showing `b` and remembers its state and expanded width
   - Configurable width via `sidebar_width` in config
   - Long project names are automatically truncated with ellipsis (…)
   - Parent-child relationships clearly shown

@@ -196,9 +196,10 @@ TERMINALIST - Todoist Terminal Client
 NAVIGATION
 ----------
 j/k         Navigate tasks (down/up)
-]/[ or J/K  Navigate sidebar items (down/up)
+Left/Right  Cycle smart views in the top bar
+]/[ or J/K  Navigate projects and labels in the sidebar
 H/L         Collapse/expand the selected project folder
-Mouse       Click sidebar items to navigate
+Mouse       Click smart views, projects, or labels to navigate
 Enter       Open task details or confirm action
 Esc         Cancel action or close dialogs
 
@@ -233,7 +234,7 @@ GENERAL CONTROLS
 ----------------
 ?           Toggle help panel
 h           Toggle help panel
-b           Toggle sidebar visibility
+b           Expand/collapse Projects & Labels
 q           Quit application
 i           Change icon theme
 

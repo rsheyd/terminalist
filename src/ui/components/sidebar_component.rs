@@ -1,7 +1,7 @@
 //! Sidebar navigation component for the Terminalist application.
 //!
 //! This component provides the main navigation interface, allowing users to switch
-//! between different views (Today, Tomorrow, Upcoming) and browse projects and labels.
+//! between projects and labels.
 //! It handles keyboard and mouse navigation with proper visual feedback.
 
 use crate::constants::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
@@ -18,6 +18,7 @@ use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKin
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
+    text::Line,
     widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
@@ -27,7 +28,6 @@ use uuid::Uuid;
 /// Navigation sidebar component for switching between views, projects, and labels.
 ///
 /// The sidebar provides a hierarchical navigation structure:
-/// - Special views (Today, Tomorrow, Upcoming)
 /// - Projects (user-created project list)
 /// - Labels (for filtering tasks by label)
 ///
@@ -60,7 +60,7 @@ impl Default for SidebarComponent {
 impl SidebarComponent {
     pub fn new() -> Self {
         let mut list_state = ListState::default();
-        list_state.select(Some(0)); // Start with Today selected
+        list_state.select(None);
         Self {
             selection: SidebarSelection::Today,
             projects: Vec::new(),
@@ -100,11 +100,6 @@ impl SidebarComponent {
             .iter()
             .map(|project| project.name.chars().count() + 4)
             .chain(self.labels.iter().map(|label| label.name.chars().count() + 2))
-            .chain(
-                ["Today", "Agenda", "Tomorrow", "Upcoming", "Trash"]
-                    .into_iter()
-                    .map(|name| name.len() + 1),
-            )
             .max()
             .unwrap_or(10);
         let count_width = self
@@ -112,12 +107,6 @@ impl SidebarComponent {
             .projects
             .values()
             .chain(self.navigation_counts.labels.values())
-            .chain([
-                &self.navigation_counts.today,
-                &self.navigation_counts.tomorrow,
-                &self.navigation_counts.upcoming,
-                &self.navigation_counts.trash,
-            ])
             .map(|count| count.to_string().len())
             .max()
             .unwrap_or(1);
@@ -150,30 +139,6 @@ impl SidebarComponent {
     /// Build the flattened list of sidebar items, respecting folder expanded/collapsed states
     fn build_item_list(&mut self) {
         self.items.clear();
-
-        // Add special views (always visible)
-        self.items.push(SidebarItemType::SpecialView {
-            name: "Today".to_string(),
-            selection: SidebarSelection::Today,
-        });
-        self.items.push(SidebarItemType::SpecialView {
-            name: "Agenda".to_string(),
-            selection: SidebarSelection::Agenda,
-        });
-        self.items.push(SidebarItemType::SpecialView {
-            name: "Tomorrow".to_string(),
-            selection: SidebarSelection::Tomorrow,
-        });
-        self.items.push(SidebarItemType::SpecialView {
-            name: "Upcoming".to_string(),
-            selection: SidebarSelection::Upcoming,
-        });
-        if self.navigation_counts.trash > 0 {
-            self.items.push(SidebarItemType::SpecialView {
-                name: "Trash".to_string(),
-                selection: SidebarSelection::Trash,
-            });
-        }
 
         // Use placeholder account ID for now
         let account_id = "main".to_string();
@@ -299,13 +264,11 @@ impl SidebarComponent {
 
     /// Update list state to reflect current selection (not scroll position)
     fn update_list_state(&mut self) {
-        // Find the index of the current selection
-        let selection_index = self.selection_to_index(&self.selection);
-        self.list_state.select(Some(selection_index));
-
-        // Update scrollbar state for selection-based positioning
         let total_items = self.total_items();
-        self.scrollbar_helper.update_state(total_items, selection_index, None);
+        let selection_index = self.selection_to_index(&self.selection);
+        self.list_state.select(selection_index);
+        self.scrollbar_helper
+            .update_state(total_items, selection_index.unwrap_or(0), None);
     }
 
     fn get_sorted_projects(&self) -> Vec<(usize, &project::Model)> {
@@ -374,16 +337,15 @@ impl SidebarComponent {
     }
 
     /// Convert SidebarSelection to list index
-    fn selection_to_index(&self, selection: &SidebarSelection) -> usize {
+    fn selection_to_index(&self, selection: &SidebarSelection) -> Option<usize> {
         for (index, item) in self.items.iter().enumerate() {
             if let Some(item_selection) = item.get_selection() {
                 if &item_selection == selection {
-                    return index;
+                    return Some(index);
                 }
             }
         }
-        // If not found, default to 0 (Today)
-        0
+        None
     }
 
     /// Handle mouse events
@@ -419,13 +381,12 @@ impl SidebarComponent {
             }
             // Mouse wheel for navigation (move selection like task list)
             MouseEventKind::ScrollUp => {
-                let current_index = self.list_state.selected().unwrap_or(0);
                 // Find previous selectable item
-                for offset in 1..=self.items.len() {
-                    let prev_index = if current_index >= offset {
-                        current_index - offset
+                for offset in 0..self.items.len() {
+                    let prev_index = if let Some(current_index) = self.list_state.selected() {
+                        (current_index + self.items.len() - offset - 1) % self.items.len()
                     } else {
-                        self.items.len() + current_index - offset
+                        self.items.len() - offset - 1
                     };
                     if let Some(item) = self.items.get(prev_index) {
                         if item.is_selectable() {
@@ -439,10 +400,12 @@ impl SidebarComponent {
                 Action::None
             }
             MouseEventKind::ScrollDown => {
-                let current_index = self.list_state.selected().unwrap_or(0);
                 // Find next selectable item
-                for offset in 1..=self.items.len() {
-                    let next_index = (current_index + offset) % self.items.len();
+                for offset in 0..self.items.len() {
+                    let next_index = self
+                        .list_state
+                        .selected()
+                        .map_or(offset, |current_index| (current_index + offset + 1) % self.items.len());
                     if let Some(item) = self.items.get(next_index) {
                         if item.is_selectable() {
                             if let Some(selection) = item.get_selection() {
@@ -490,11 +453,12 @@ impl Component for SidebarComponent {
                 if !key.modifiers.contains(KeyModifiers::CONTROL) =>
             {
                 // Move to next selectable item, skipping non-selectable items (folders)
-                let current_index = self.list_state.selected().unwrap_or(0);
-
                 // Search forward for next selectable item
-                for offset in 1..=self.items.len() {
-                    let next_index = (current_index + offset) % self.items.len();
+                for offset in 0..self.items.len() {
+                    let next_index = self
+                        .list_state
+                        .selected()
+                        .map_or(offset, |current_index| (current_index + offset + 1) % self.items.len());
                     if let Some(item) = self.items.get(next_index) {
                         if item.is_selectable() {
                             if let Some(selection) = item.get_selection() {
@@ -508,14 +472,12 @@ impl Component for SidebarComponent {
             }
             KeyCode::Char('K') | KeyCode::Char('[') | KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 // Move to previous selectable item, skipping non-selectable items (folders)
-                let current_index = self.list_state.selected().unwrap_or(0);
-
                 // Search backward for previous selectable item
-                for offset in 1..=self.items.len() {
-                    let prev_index = if current_index >= offset {
-                        current_index - offset
+                for offset in 0..self.items.len() {
+                    let prev_index = if let Some(current_index) = self.list_state.selected() {
+                        (current_index + self.items.len() - offset - 1) % self.items.len()
                     } else {
-                        self.items.len() + current_index - offset
+                        self.items.len() - offset - 1
                     };
                     if let Some(item) = self.items.get(prev_index) {
                         if item.is_selectable() {
@@ -582,7 +544,8 @@ impl Component for SidebarComponent {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
-                    .title("Navigation")
+                    .title("Projects & Labels")
+                    .title_bottom(Line::styled(" b to hide ", Style::default().fg(pane_color)).right_aligned())
                     .title_style(Style::default().fg(pane_color))
                     .border_style(Style::default().fg(pane_color)),
             )
@@ -622,14 +585,27 @@ mod tests {
     use super::*;
     use ratatui::{backend::TestBackend, Terminal};
 
+    fn label_named(name: &str) -> label::Model {
+        label::Model {
+            uuid: Uuid::new_v4(),
+            backend_uuid: Uuid::new_v4(),
+            remote_id: name.to_string(),
+            name: name.to_string(),
+            order_index: 0,
+            is_favorite: false,
+        }
+    }
+
     #[test]
-    fn refreshed_today_count_replaces_the_previous_value() {
+    fn refreshed_selected_label_count_replaces_the_previous_value() {
         let mut sidebar = SidebarComponent::new();
+        let label = label_named("Work");
+        sidebar.selection = SidebarSelection::Label(label.uuid);
         sidebar.update_data(
             Vec::new(),
-            Vec::new(),
+            vec![label.clone()],
             NavigationCounts {
-                today: 14,
+                labels: HashMap::from([(label.uuid, 14)]),
                 ..NavigationCounts::default()
             },
             14,
@@ -640,9 +616,9 @@ mod tests {
 
         sidebar.update_data(
             Vec::new(),
-            Vec::new(),
+            vec![label.clone()],
             NavigationCounts {
-                today: 14,
+                labels: HashMap::from([(label.uuid, 14)]),
                 ..NavigationCounts::default()
             },
             0,
@@ -665,38 +641,54 @@ mod tests {
     #[test]
     fn inactive_item_text_is_not_dimmed_by_the_count_overlay() {
         let mut sidebar = SidebarComponent::new();
-        sidebar.update_data(Vec::new(), Vec::new(), NavigationCounts::default(), 0);
+        sidebar.update_data(Vec::new(), vec![label_named("Work")], NavigationCounts::default(), 0);
         let backend = TestBackend::new(30, 10);
         let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| sidebar.render(frame, frame.area())).unwrap();
 
         let buffer = terminal.backend().buffer();
-        assert_eq!(buffer.cell((2, 2)).unwrap().fg, Color::White);
-        assert_eq!(buffer.cell((28, 2)).unwrap().fg, Color::DarkGray);
+        assert_eq!(buffer.cell((2, 1)).unwrap().fg, Color::White);
+        assert_eq!(buffer.cell((28, 1)).unwrap().fg, Color::DarkGray);
     }
 
     #[test]
-    fn trash_only_appears_when_it_has_items() {
+    fn smart_views_do_not_appear_in_the_sidebar() {
         let mut sidebar = SidebarComponent::new();
-        sidebar.update_data(Vec::new(), Vec::new(), NavigationCounts::default(), 0);
-        assert!(!sidebar
-            .items
-            .iter()
-            .any(|item| item.get_selection() == Some(SidebarSelection::Trash)));
-
         sidebar.update_data(
             Vec::new(),
-            Vec::new(),
+            vec![label_named("Work")],
             NavigationCounts {
                 trash: 2,
                 ..NavigationCounts::default()
             },
             0,
         );
-        assert!(sidebar
-            .items
+        assert!(sidebar.items.iter().all(|item| {
+            matches!(
+                item.get_selection(),
+                Some(SidebarSelection::Project(_) | SidebarSelection::Label(_))
+            )
+        }));
+    }
+
+    #[test]
+    fn expanded_sidebar_shows_hide_hint_on_bottom_border() {
+        let backend = TestBackend::new(26, 8);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut sidebar = SidebarComponent::new();
+
+        terminal.draw(|frame| sidebar.render(frame, frame.area())).unwrap();
+
+        let bottom_row = terminal
+            .backend()
+            .buffer()
+            .content
             .iter()
-            .any(|item| item.get_selection() == Some(SidebarSelection::Trash)));
+            .skip(26 * 7)
+            .take(26)
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(bottom_row.contains("b to hide"), "bottom row: {bottom_row:?}");
     }
 }

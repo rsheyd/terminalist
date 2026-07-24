@@ -1,4 +1,5 @@
-use terminalist::config::Config;
+use std::fs;
+use terminalist::config::{Config, UiState};
 use terminalist::utils::datetime;
 
 #[test]
@@ -111,4 +112,32 @@ fn test_generate_config_creates_directory() {
 
     // Clean up
     let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn ui_state_round_trips_sidebar_layout_separately() {
+    let state_path = std::env::temp_dir().join(format!("terminalist-ui-state-{}.toml", uuid::Uuid::new_v4()));
+    let state = UiState {
+        sidebar_collapsed: true,
+        sidebar_width: 41,
+    };
+
+    state.save(&state_path).unwrap();
+    let loaded = UiState::load_or_config(&state_path, &Config::default().ui);
+
+    assert!(loaded.sidebar_collapsed);
+    assert_eq!(loaded.sidebar_width, 41);
+    std::fs::remove_file(state_path).unwrap();
+}
+
+#[test]
+fn ui_state_migrates_the_legacy_default_sidebar_width() {
+    let state_path = std::env::temp_dir().join(format!("terminalist-ui-state-{}.toml", uuid::Uuid::new_v4()));
+    fs::write(&state_path, "sidebar_collapsed = true\nsidebar_width = 30\n").unwrap();
+
+    let loaded = UiState::load_or_config(&state_path, &Config::default().ui);
+
+    assert!(loaded.sidebar_collapsed);
+    assert_eq!(loaded.sidebar_width, 26);
+    fs::remove_file(state_path).unwrap();
 }
