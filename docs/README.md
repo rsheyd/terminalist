@@ -14,6 +14,7 @@ This directory contains all documentation for Terminalist.
 - **[Current UI Work Baseline](CURRENT_UI_WORK_BASELINE.md)** - Scope, commit strategy, validation, and review guidance for the current UI changes
 - **[Post-PR #188 Changes](POST_PR188_CHANGES.md)** - Feature ledger, validation record, and future PR notes for `codex/post-pr188`
 - **[Architecture Refactor Plan](ARCHITECTURE_REFACTOR_PLAN.md)** - Implementation status and remaining correctness, performance, and transport improvements
+- **[AI Task Management Plan](AI_TASK_MANAGEMENT_PLAN.md)** - Proposed approval-based AI workflow for reviewing and applying coordinated task changes
 
 ## Additional Documentation
 

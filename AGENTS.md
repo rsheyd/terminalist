@@ -12,3 +12,4 @@
 - `tests/`: integration and UI behavior tests.
 - `docs/KEYBOARD_SHORTCUTS.md`: user-facing controls and view behavior.
 - `docs/POST_PR188_CHANGES.md`: branch-local feature ledger and future PR source notes.
+- `docs/AI_TASK_MANAGEMENT_PLAN.md`: proposed AI-assisted task-management workflow and implementation plan.
