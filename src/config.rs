@@ -14,10 +14,21 @@ const LEGACY_SIDEBAR_DEFAULT_WIDTH: u16 = 30;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
+    pub ai: AiConfig,
     pub ui: UiConfig,
     pub sync: SyncConfig,
     pub display: DisplayConfig,
     pub logging: LoggingConfig,
+}
+
+/// AI task-management configuration. API key values are never stored here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AiConfig {
+    /// Model used to generate reviewed task-management proposals.
+    pub model: String,
+    /// Environment variable containing the OpenAI API key.
+    pub api_key_env: String,
 }
 
 /// UI configuration
@@ -87,6 +98,15 @@ impl Default for UiConfig {
             sidebar_width: SIDEBAR_DEFAULT_WIDTH,
             sidebar_visible: true,
             shortcut_bar_visible: true,
+        }
+    }
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            model: "gpt-5.6-sol".to_string(),
+            api_key_env: "OPENAI_VALERIA_API_KEY".to_string(),
         }
     }
 }
@@ -210,6 +230,13 @@ impl Config {
                 SIDEBAR_MAX_WIDTH,
                 self.ui.sidebar_width
             );
+        }
+
+        if self.ai.model.trim().is_empty() {
+            anyhow::bail!("ai.model cannot be empty");
+        }
+        if self.ai.api_key_env.trim().is_empty() {
+            anyhow::bail!("ai.api_key_env cannot be empty");
         }
 
         // Validate default project

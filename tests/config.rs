@@ -6,6 +6,8 @@ use terminalist::utils::datetime;
 fn test_default_config() {
     let config = Config::default();
     assert_eq!(config.ui.default_project, "today");
+    assert_eq!(config.ai.model, "gpt-5.6-sol");
+    assert_eq!(config.ai.api_key_env, "OPENAI_VALERIA_API_KEY");
     assert!(config.ui.shortcut_bar_visible);
     assert_eq!(config.sync.auto_sync_interval_minutes, 5);
     assert!(config.display.show_descriptions);
@@ -36,6 +38,7 @@ fn test_config_serialization() {
     let toml_str = toml::to_string_pretty(&config).unwrap();
     assert!(toml_str.contains("default_project = \"today\""));
     assert!(toml_str.contains("auto_sync_interval_minutes = 5"));
+    assert!(toml_str.contains("api_key_env = \"OPENAI_VALERIA_API_KEY\""));
 }
 
 #[test]

@@ -22,6 +22,10 @@ This creates a config file at `~/.config/terminalist/config.toml` with all avail
 ### Example Configuration
 
 ```toml
+[ai]
+model = "gpt-5.6-sol"
+api_key_env = "OPENAI_VALERIA_API_KEY"
+
 [ui]
 default_project = "today"         # Options: "inbox", "today", "tomorrow", "upcoming", project ID, or project name
 mouse_enabled = true              # Enable mouse support
@@ -43,6 +47,19 @@ show_project_colors = false       # Show project colors
 [logging]
 enabled = false                   # Enable logging to file
 ```
+
+### AI Task Management
+
+- **model**: OpenAI model used to generate proposals. The default is
+  `gpt-5.6-sol`.
+- **api_key_env**: Name of the environment variable containing the API key.
+  The current personal setup uses `OPENAI_VALERIA_API_KEY`. This is a temporary
+  credential source and can be changed later without changing code.
+
+Terminalist reads the key at runtime and never writes its value to the
+configuration file or logs. For a shell launch, export the variable before
+starting Terminalist; placing the export in `~/.zshrc` is appropriate when the
+app is normally launched from an interactive zsh shell.
 
 ### UI Configuration
 

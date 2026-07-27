@@ -5,7 +5,9 @@
 
 ## File map
 
+- `src/ai/`: Narrow AI provider boundary, structured proposal generation, and validation.
 - `src/backend/`: Backend API adapters and full/incremental sync payloads.
+- `src/priority.rs`: Human-readable task priorities and Todoist API conversion.
 - `src/sync/`: Todoist synchronization and local cache reconciliation.
 - `src/repositories/`: SQLite queries.
 - `src/ui/`: actions, navigation, dialogs, and TUI components.

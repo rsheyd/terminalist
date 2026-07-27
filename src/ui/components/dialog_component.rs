@@ -10,9 +10,10 @@ use crate::icons::IconService;
 use crate::sync::SyncService;
 use crate::ui::components::task_list_item_component::{ListItem as TaskListItem, TaskItem};
 use crate::ui::core::{
-    actions::{Action, DialogType},
+    actions::{Action, AiAssistStage, AiProposalPage, DialogType},
     Component,
 };
+use crate::ui::layout::LayoutManager;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::Rect, widgets::ScrollbarState, Frame};
 use uuid::Uuid;
@@ -62,6 +63,13 @@ pub struct DialogComponent {
     pub search_results: Vec<task::Model>,
     pub search_selected_index: usize,
     pub search_results_focused: bool,
+    pub ai_selected_action_index: usize,
+    pub ai_proposal_page: AiProposalPage,
+    pub ai_recommendation_scroll: usize,
+    ai_recommendation_max_scroll: usize,
+    ai_original_context: String,
+    pub ai_error_message: Option<String>,
+    ai_input_width: u16,
     pub sync_service: Option<SyncService>,
     pub display_config: DisplayConfig,
 }
@@ -92,6 +100,13 @@ impl DialogComponent {
             search_results: Vec::new(),
             search_selected_index: 0,
             search_results_focused: false,
+            ai_selected_action_index: 0,
+            ai_proposal_page: AiProposalPage::Recommendation,
+            ai_recommendation_scroll: 0,
+            ai_recommendation_max_scroll: 0,
+            ai_original_context: String::new(),
+            ai_error_message: None,
+            ai_input_width: 74,
             sync_service: None,
             display_config: DisplayConfig::default(),
         }
@@ -220,6 +235,37 @@ impl DialogComponent {
                     Err(message) => Action::ShowDialog(DialogType::Error(message)),
                 }
             }
+            Some(DialogType::AiTaskManagement {
+                task,
+                stage: AiAssistStage::ContextEntry,
+                ..
+            }) => {
+                if self.input_buffer.trim().is_empty() {
+                    Action::None
+                } else {
+                    Action::AiAssist {
+                        task: task.clone(),
+                        context: self.input_buffer.clone(),
+                    }
+                }
+            }
+            Some(DialogType::AiTaskManagement {
+                task,
+                stage: AiAssistStage::RevisionEntry,
+                proposal: Some(proposal),
+                ..
+            }) => {
+                if self.input_buffer.trim().is_empty() {
+                    Action::None
+                } else {
+                    Action::AiReviseProposal {
+                        task: task.clone(),
+                        original_context: self.ai_original_context.clone(),
+                        proposal: proposal.clone(),
+                        revision: self.input_buffer.clone(),
+                    }
+                }
+            }
             Some(DialogType::ProjectCreation) => {
                 if !self.input_buffer.is_empty() {
                     let parent_uuid = if let Some(parent_index) = self.selected_parent_project_index {
@@ -316,6 +362,8 @@ impl DialogComponent {
         self.scroll_offset = 0;
         self.scrollbar_state = ScrollbarState::new(0);
         self.search_results.clear();
+        self.ai_selected_action_index = 0;
+        self.ai_error_message = None;
     }
 
     fn scroll_up(&mut self) {
@@ -398,6 +446,32 @@ impl DialogComponent {
             self.cursor_position,
             &task_projects,
             current_project_index,
+        );
+    }
+
+    fn render_ai_task_management_dialog(
+        &mut self,
+        f: &mut Frame,
+        area: Rect,
+        task: &task::Model,
+        stage: AiAssistStage,
+        proposal: Option<&crate::ui::core::AiTaskProposal>,
+        report: Option<&crate::ui::core::AiExecutionReport>,
+    ) {
+        self.ai_input_width = LayoutManager::centered_rect(82, 78, area).width.saturating_sub(6);
+        self.ai_recommendation_max_scroll = task_dialogs::render_ai_task_management_dialog(
+            f,
+            area,
+            task,
+            stage,
+            &self.input_buffer,
+            self.cursor_position,
+            proposal,
+            self.ai_proposal_page,
+            self.ai_recommendation_scroll,
+            self.ai_selected_action_index,
+            self.ai_error_message.as_deref(),
+            report,
         );
     }
 
@@ -556,12 +630,294 @@ impl DialogComponent {
     fn render_logs_dialog(&mut self, f: &mut Frame, area: Rect) {
         system_dialogs::render_logs_dialog(f, area, self.scroll_offset, &mut self.scrollbar_state);
     }
+
+    fn handle_ai_task_management_key(&mut self, key: KeyEvent) -> Action {
+        let stage = match &self.dialog_type {
+            Some(DialogType::AiTaskManagement { stage, .. }) => *stage,
+            _ => return Action::None,
+        };
+
+        match stage {
+            AiAssistStage::ContextEntry => match key.code {
+                KeyCode::Esc => Action::HideDialog,
+                KeyCode::Enter => {
+                    self.ai_original_context = self.input_buffer.clone();
+                    self.handle_submit()
+                }
+                KeyCode::Char(c) => {
+                    let byte_pos: usize = self
+                        .input_buffer
+                        .chars()
+                        .take(self.cursor_position)
+                        .map(|ch| ch.len_utf8())
+                        .sum();
+                    self.input_buffer.insert(byte_pos, c);
+                    self.cursor_position += 1;
+                    Action::None
+                }
+                KeyCode::Backspace => {
+                    if self.cursor_position > 0 {
+                        let byte_pos: usize = self
+                            .input_buffer
+                            .chars()
+                            .take(self.cursor_position)
+                            .map(|ch| ch.len_utf8())
+                            .sum();
+                        let prev_char_len = self
+                            .input_buffer
+                            .chars()
+                            .nth(self.cursor_position - 1)
+                            .map(|ch| ch.len_utf8())
+                            .unwrap_or(1);
+                        self.input_buffer.remove(byte_pos - prev_char_len);
+                        self.cursor_position -= 1;
+                    }
+                    Action::None
+                }
+                KeyCode::Delete => {
+                    if self.cursor_position < self.input_buffer.chars().count() {
+                        let byte_pos: usize = self
+                            .input_buffer
+                            .chars()
+                            .take(self.cursor_position)
+                            .map(|ch| ch.len_utf8())
+                            .sum();
+                        self.input_buffer.remove(byte_pos);
+                    }
+                    Action::None
+                }
+                KeyCode::Left => {
+                    self.cursor_position = self.cursor_position.saturating_sub(1);
+                    Action::None
+                }
+                KeyCode::Right => {
+                    if self.cursor_position < self.input_buffer.chars().count() {
+                        self.cursor_position += 1;
+                    }
+                    Action::None
+                }
+                KeyCode::Up | KeyCode::Down => {
+                    let row_delta = if key.code == KeyCode::Up { -1 } else { 1 };
+                    self.cursor_position = common::move_multiline_cursor(
+                        &self.input_buffer,
+                        self.cursor_position,
+                        self.ai_input_width,
+                        row_delta,
+                    );
+                    Action::None
+                }
+                _ => Action::None,
+            },
+            AiAssistStage::RevisionEntry => match key.code {
+                KeyCode::Esc => {
+                    if let Some(DialogType::AiTaskManagement { stage, .. }) = self.dialog_type.as_mut() {
+                        *stage = AiAssistStage::ProposalReview;
+                    }
+                    self.ai_proposal_page = AiProposalPage::Actions;
+                    self.input_buffer.clear();
+                    self.cursor_position = 0;
+                    Action::None
+                }
+                KeyCode::Enter => self.handle_submit(),
+                KeyCode::Char(c) => {
+                    let byte_pos = self
+                        .input_buffer
+                        .chars()
+                        .take(self.cursor_position)
+                        .map(|ch| ch.len_utf8())
+                        .sum();
+                    self.input_buffer.insert(byte_pos, c);
+                    self.cursor_position += 1;
+                    Action::None
+                }
+                KeyCode::Backspace => {
+                    if self.cursor_position > 0 {
+                        let byte_pos: usize = self
+                            .input_buffer
+                            .chars()
+                            .take(self.cursor_position)
+                            .map(|ch| ch.len_utf8())
+                            .sum();
+                        let previous_width = self
+                            .input_buffer
+                            .chars()
+                            .nth(self.cursor_position - 1)
+                            .map(|ch| ch.len_utf8())
+                            .unwrap_or(1);
+                        self.input_buffer.remove(byte_pos - previous_width);
+                        self.cursor_position -= 1;
+                    }
+                    Action::None
+                }
+                KeyCode::Delete => {
+                    if self.cursor_position < self.input_buffer.chars().count() {
+                        let byte_pos: usize = self
+                            .input_buffer
+                            .chars()
+                            .take(self.cursor_position)
+                            .map(|ch| ch.len_utf8())
+                            .sum();
+                        self.input_buffer.remove(byte_pos);
+                    }
+                    Action::None
+                }
+                KeyCode::Left => {
+                    self.cursor_position = self.cursor_position.saturating_sub(1);
+                    Action::None
+                }
+                KeyCode::Right => {
+                    if self.cursor_position < self.input_buffer.chars().count() {
+                        self.cursor_position += 1;
+                    }
+                    Action::None
+                }
+                KeyCode::Up | KeyCode::Down => {
+                    let row_delta = if key.code == KeyCode::Up { -1 } else { 1 };
+                    self.cursor_position = common::move_multiline_cursor(
+                        &self.input_buffer,
+                        self.cursor_position,
+                        self.ai_input_width,
+                        row_delta,
+                    );
+                    Action::None
+                }
+                _ => Action::None,
+            },
+            AiAssistStage::Generating => Action::None,
+            AiAssistStage::ProposalReview => {
+                let action_count = match &self.dialog_type {
+                    Some(DialogType::AiTaskManagement {
+                        proposal: Some(proposal),
+                        ..
+                    }) => proposal.actions.len(),
+                    _ => 0,
+                };
+
+                match key.code {
+                    KeyCode::Esc => Action::HideDialog,
+                    KeyCode::Left => {
+                        self.ai_proposal_page = AiProposalPage::Recommendation;
+                        Action::None
+                    }
+                    KeyCode::Right => {
+                        self.ai_proposal_page = AiProposalPage::Actions;
+                        Action::None
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        match self.ai_proposal_page {
+                            AiProposalPage::Recommendation => {
+                                self.ai_recommendation_scroll = self.ai_recommendation_scroll.saturating_sub(1);
+                            }
+                            AiProposalPage::Actions => {
+                                self.ai_selected_action_index = self.ai_selected_action_index.saturating_sub(1);
+                            }
+                        }
+                        Action::None
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        match self.ai_proposal_page {
+                            AiProposalPage::Recommendation => {
+                                self.ai_recommendation_scroll = self
+                                    .ai_recommendation_scroll
+                                    .saturating_add(1)
+                                    .min(self.ai_recommendation_max_scroll);
+                            }
+                            AiProposalPage::Actions => {
+                                if self.ai_selected_action_index + 1 < action_count {
+                                    self.ai_selected_action_index += 1;
+                                }
+                            }
+                        }
+                        Action::None
+                    }
+                    KeyCode::Char(' ') => {
+                        if self.ai_proposal_page != AiProposalPage::Actions {
+                            return Action::None;
+                        }
+                        if let Some(DialogType::AiTaskManagement {
+                            proposal: Some(proposal),
+                            ..
+                        }) = self.dialog_type.as_mut()
+                        {
+                            if let Some(action) = proposal.actions.get_mut(self.ai_selected_action_index) {
+                                action.enabled = !action.enabled;
+                            }
+                        }
+                        self.ai_error_message = None;
+                        Action::None
+                    }
+                    KeyCode::Char('r') if self.ai_proposal_page == AiProposalPage::Actions => {
+                        if let Some(DialogType::AiTaskManagement { stage, .. }) = self.dialog_type.as_mut() {
+                            *stage = AiAssistStage::RevisionEntry;
+                        }
+                        self.input_buffer.clear();
+                        self.cursor_position = 0;
+                        self.ai_error_message = None;
+                        Action::None
+                    }
+                    KeyCode::Enter => {
+                        if self.ai_proposal_page == AiProposalPage::Recommendation {
+                            self.ai_proposal_page = AiProposalPage::Actions;
+                            return Action::None;
+                        }
+                        let proposal = match &self.dialog_type {
+                            Some(DialogType::AiTaskManagement {
+                                proposal: Some(proposal),
+                                ..
+                            }) => proposal.clone(),
+                            _ => return Action::None,
+                        };
+                        match proposal.validate() {
+                            Ok(()) => {
+                                if let Some(DialogType::AiTaskManagement { stage, .. }) = self.dialog_type.as_mut() {
+                                    *stage = AiAssistStage::ApplyConfirmation;
+                                }
+                                self.ai_error_message = None;
+                            }
+                            Err(message) => self.ai_error_message = Some(message),
+                        }
+                        Action::None
+                    }
+                    _ => Action::None,
+                }
+            }
+            AiAssistStage::ApplyConfirmation => match key.code {
+                KeyCode::Esc => {
+                    if let Some(DialogType::AiTaskManagement { stage, .. }) = self.dialog_type.as_mut() {
+                        *stage = AiAssistStage::ProposalReview;
+                    }
+                    Action::None
+                }
+                KeyCode::Enter => match &self.dialog_type {
+                    Some(DialogType::AiTaskManagement {
+                        task,
+                        proposal: Some(proposal),
+                        ..
+                    }) => Action::AiApplyProposal {
+                        task: task.clone(),
+                        proposal: proposal.clone(),
+                    },
+                    _ => Action::None,
+                },
+                _ => Action::None,
+            },
+            AiAssistStage::Applying => Action::None,
+            AiAssistStage::Result => match key.code {
+                KeyCode::Esc | KeyCode::Enter => Action::HideDialog,
+                _ => Action::None,
+            },
+        }
+    }
 }
 
 impl Component for DialogComponent {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
         if self.dialog_type.is_none() {
             return Action::None;
+        }
+
+        if matches!(self.dialog_type, Some(DialogType::AiTaskManagement { .. })) {
+            return self.handle_ai_task_management_key(key);
         }
 
         match &self.dialog_type {
@@ -571,6 +927,12 @@ impl Component for DialogComponent {
                     task_uuid: task.uuid,
                     content: task.content.clone(),
                     project_uuid: task.project_uuid,
+                }),
+                KeyCode::Char('m') => Action::ShowDialog(DialogType::AiTaskManagement {
+                    task: task.clone(),
+                    stage: AiAssistStage::ContextEntry,
+                    proposal: None,
+                    report: None,
                 }),
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.scroll_up();
@@ -931,6 +1293,56 @@ impl Component for DialogComponent {
 
     fn update(&mut self, action: Action) -> Action {
         match action {
+            Action::AiProposalGenerated { task, proposal } => {
+                self.input_buffer.clear();
+                self.cursor_position = 0;
+                self.ai_selected_action_index = 0;
+                self.ai_proposal_page = AiProposalPage::Recommendation;
+                self.ai_recommendation_scroll = 0;
+                self.ai_recommendation_max_scroll = 0;
+                self.ai_error_message = None;
+                self.dialog_type = Some(DialogType::AiTaskManagement {
+                    task,
+                    stage: AiAssistStage::ProposalReview,
+                    proposal: Some(proposal),
+                    report: None,
+                });
+                Action::None
+            }
+            Action::AiProposalFailed { task, message } => {
+                self.ai_error_message = Some(message);
+                self.dialog_type = Some(DialogType::AiTaskManagement {
+                    task,
+                    stage: AiAssistStage::ContextEntry,
+                    proposal: None,
+                    report: None,
+                });
+                Action::None
+            }
+            Action::AiProposalRevisionFailed {
+                task,
+                proposal,
+                message,
+            } => {
+                self.ai_error_message = Some(message);
+                self.ai_proposal_page = AiProposalPage::Actions;
+                self.dialog_type = Some(DialogType::AiTaskManagement {
+                    task,
+                    stage: AiAssistStage::ProposalReview,
+                    proposal: Some(proposal),
+                    report: None,
+                });
+                Action::None
+            }
+            Action::AiAssistFinished { task, proposal, report } => {
+                self.dialog_type = Some(DialogType::AiTaskManagement {
+                    task,
+                    stage: AiAssistStage::Result,
+                    proposal: Some(proposal),
+                    report: Some(report),
+                });
+                Action::None
+            }
             Action::ShowDialog(dialog_type) => {
                 // Check if this is a task creation dialog before moving the value
                 let is_task_creation = matches!(dialog_type, DialogType::TaskCreation { .. });
@@ -983,6 +1395,12 @@ impl Component for DialogComponent {
                         self.search_selected_index = 0;
                         self.search_results_focused = false;
                     }
+                    DialogType::AiTaskManagement { .. } => {
+                        self.input_buffer.clear();
+                        self.cursor_position = 0;
+                        self.ai_selected_action_index = 0;
+                        self.ai_error_message = None;
+                    }
                     _ => {
                         self.input_buffer.clear();
                         self.cursor_position = 0;
@@ -1032,6 +1450,14 @@ impl Component for DialogComponent {
                 DialogType::TaskEdit { .. } => self.render_task_edit_dialog(f, rect),
                 DialogType::TaskTime { .. } => {
                     task_dialogs::render_task_time_dialog(f, rect, &self.input_buffer, self.cursor_position)
+                }
+                DialogType::AiTaskManagement {
+                    task,
+                    stage,
+                    proposal,
+                    report,
+                } => {
+                    self.render_ai_task_management_dialog(f, rect, &task, stage, proposal.as_ref(), report.as_ref());
                 }
                 DialogType::ProjectCreation => {
                     self.render_project_creation_dialog(f, rect);

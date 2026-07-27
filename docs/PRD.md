@@ -43,7 +43,7 @@ Terminalist is a high-performance terminal user interface (TUI) application for 
 #### User Interface
 - **Responsive Layout**: Adapts to terminal size with smart scaling
 - **Status Indicators**: Visual task status (pending, completed, deleted)
-- **Priority Badges**: P0/P1/P2/P3 priority system with visual indicators
+- **Priority Badges**: Low/medium/high/urgent priority system with visual indicators
 - **Help System**: Built-in help panel with keyboard shortcuts
 - **Error Handling**: Comprehensive error messages and recovery
 
@@ -91,7 +91,7 @@ Terminalist is a high-performance terminal user interface (TUI) application for 
 - **FR-003**: Users can complete tasks
 - **FR-004**: Users can delete tasks with confirmation dialog
 - **FR-005**: Users can navigate tasks using j/k keys (down/up)
-- **FR-006**: Tasks display priority badges (P0-P3) and label badges
+- **FR-006**: Tasks display named-priority and label badges
 - **FR-007**: Tasks are sorted by status (pending → completed → deleted)
 
 #### 3.1.2 Project Management

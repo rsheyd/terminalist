@@ -199,6 +199,7 @@ pub trait Backend: Send + Sync {
     async fn delete_task(&self, remote_id: &str) -> Result<(), BackendError>;
     async fn complete_task(&self, remote_id: &str) -> Result<(), BackendError>;
     async fn reopen_task(&self, remote_id: &str) -> Result<(), BackendError>;
+    async fn create_task_comment(&self, remote_task_id: &str, content: &str) -> Result<(), BackendError>;
 
     // CRUD operations for labels
     async fn create_label(&self, args: CreateLabelArgs) -> Result<BackendLabel, BackendError>;

@@ -35,7 +35,10 @@ pub mod task_manager;
 pub mod view_snapshot;
 
 // Re-export core types for easier access from other modules
-pub use actions::{Action, DialogType, SidebarSelection};
+pub use actions::{
+    Action, AiAssistStage, AiExecutionReport, AiProjectDestination, AiProposalPage, AiProposedAction,
+    AiProposedActionKind, AiTaskProposal, DialogType, SidebarSelection,
+};
 pub use component::Component;
 pub use context::AppContext;
 pub use event_handler::{EventHandler, EventType};

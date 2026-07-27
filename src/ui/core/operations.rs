@@ -133,7 +133,8 @@ impl Operation {
             Self::Project(ProjectOperation::Create { name, parent_uuid }) => sync_service
                 .create_project(&name, parent_uuid)
                 .await
-                .context(description.clone())?,
+                .context(description.clone())
+                .map(|_| ())?,
             Self::Project(ProjectOperation::Edit { project_uuid, name }) => sync_service
                 .update_project_content(&project_uuid, &name)
                 .await

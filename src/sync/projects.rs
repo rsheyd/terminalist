@@ -42,7 +42,7 @@ impl SyncService {
     ///
     /// # Errors
     /// Returns an error if the backend call fails or local storage update fails
-    pub async fn create_project(&self, name: &str, parent_uuid: Option<Uuid>) -> Result<()> {
+    pub async fn create_project(&self, name: &str, parent_uuid: Option<Uuid>) -> Result<Uuid> {
         // Look up remote_id for parent project if provided
         let remote_parent_id = if let Some(uuid) = parent_uuid {
             Some(self.get_project_remote_id(&uuid).await?)
@@ -67,8 +67,9 @@ impl SyncService {
         let storage = self.storage.lock().await;
 
         // Upsert the project
+        let project_uuid = Uuid::new_v4();
         let local_project = project::ActiveModel {
-            uuid: ActiveValue::Set(Uuid::new_v4()),
+            uuid: ActiveValue::Set(project_uuid),
             backend_uuid: ActiveValue::Set(self.backend_uuid),
             remote_id: ActiveValue::Set(backend_project.remote_id),
             name: ActiveValue::Set(backend_project.name),
@@ -92,7 +93,7 @@ impl SyncService {
         );
         insert.exec(&storage.conn).await?;
 
-        Ok(())
+        Ok(project_uuid)
     }
 
     /// Update project content (name only for now)

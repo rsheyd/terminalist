@@ -19,6 +19,9 @@
 /// Backend abstraction layer for multi-backend support
 pub mod backend;
 
+/// Review-first AI task-management proposal generation
+pub mod ai;
+
 /// Backend registry for managing multiple backend instances
 pub mod backend_registry;
 
@@ -39,6 +42,9 @@ pub mod logger;
 
 /// Repository layer for database operations
 pub mod repositories;
+
+/// Human-readable priority names and Todoist API conversion
+pub mod priority;
 
 /// Local storage layer for caching Todoist data
 pub mod storage;

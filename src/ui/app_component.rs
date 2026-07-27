@@ -1,10 +1,15 @@
+use crate::ai::{AiProvider, AiTaskRequest, OpenAiProvider};
 use crate::config::{Config, UiState};
 use crate::constants::*;
 use crate::entities::{label, project, section, task};
+use crate::sync::tasks::RichCreateTaskArgs;
 use crate::sync::{SyncService, SyncStatus};
 use crate::ui::components::{DialogComponent, SidebarComponent, TaskListComponent};
 use crate::ui::core::{
-    actions::{Action, DialogType, NavigationCounts, TaskDueDate},
+    actions::{
+        Action, AiAssistStage, AiExecutionReport, AiProjectDestination, AiProposedActionKind, DialogType,
+        NavigationCounts, TaskDueDate,
+    },
     event_handler::EventType,
     operations::{LabelOperation, Operation, ProjectOperation, TaskOperation},
     task_manager::{TaskId, TaskManager},
@@ -23,6 +28,19 @@ use uuid::Uuid;
 
 const SMART_VIEW_BAR_HEIGHT: u16 = 3;
 const COLLAPSED_SIDEBAR_WIDTH: u16 = 3;
+
+fn resolve_ai_destination(
+    destination: &AiProjectDestination,
+    created_projects: &std::collections::HashMap<String, Uuid>,
+) -> Result<Uuid, String> {
+    match destination {
+        AiProjectDestination::Existing { uuid, .. } => Ok(*uuid),
+        AiProjectDestination::Proposed { reference, name, .. } => created_projects
+            .get(reference)
+            .copied()
+            .ok_or_else(|| format!("Created project '{name}' was not available to a dependent action.")),
+    }
+}
 
 /// Application state separate from UI concerns
 #[derive(Debug, Clone, Default)]
@@ -588,6 +606,193 @@ impl AppComponent {
                 Action::None
             }
             // Task operations with background execution
+            Action::AiAssist { task, context } => {
+                self.dialog.update(Action::ShowDialog(DialogType::AiTaskManagement {
+                    task: task.clone(),
+                    stage: AiAssistStage::Generating,
+                    proposal: None,
+                    report: None,
+                }));
+                let provider = match OpenAiProvider::from_config(&self.config.ai) {
+                    Ok(provider) => provider,
+                    Err(error) => {
+                        self.dialog.update(Action::AiProposalFailed {
+                            task,
+                            message: error.to_string(),
+                        });
+                        return Action::None;
+                    }
+                };
+                let project_name = self
+                    .state
+                    .projects
+                    .iter()
+                    .find(|project| project.uuid == task.project_uuid)
+                    .map(|project| project.name.clone())
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let section_name = task.section_uuid.and_then(|uuid| {
+                    self.state
+                        .sections
+                        .iter()
+                        .find(|section| section.uuid == uuid)
+                        .map(|section| section.name.clone())
+                });
+                let request = AiTaskRequest {
+                    task: (*task).clone(),
+                    context,
+                    project_name,
+                    section_name,
+                    available_projects: self.state.projects.clone(),
+                    available_tasks: self.state.all_tasks.clone(),
+                    previous_proposal: None,
+                    revision_request: None,
+                };
+                self.task_manager.spawn_ai_proposal_generation(task, move || async move {
+                    provider.generate_proposal(request).await
+                });
+                Action::None
+            }
+            Action::AiReviseProposal {
+                task,
+                original_context,
+                proposal,
+                revision,
+            } => {
+                self.dialog.update(Action::ShowDialog(DialogType::AiTaskManagement {
+                    task: task.clone(),
+                    stage: AiAssistStage::Generating,
+                    proposal: Some(proposal.clone()),
+                    report: None,
+                }));
+                let provider = match OpenAiProvider::from_config(&self.config.ai) {
+                    Ok(provider) => provider,
+                    Err(error) => {
+                        self.dialog.update(Action::AiProposalRevisionFailed {
+                            task,
+                            proposal,
+                            message: error.to_string(),
+                        });
+                        return Action::None;
+                    }
+                };
+                let project_name = self
+                    .state
+                    .projects
+                    .iter()
+                    .find(|project| project.uuid == task.project_uuid)
+                    .map(|project| project.name.clone())
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let section_name = task.section_uuid.and_then(|uuid| {
+                    self.state
+                        .sections
+                        .iter()
+                        .find(|section| section.uuid == uuid)
+                        .map(|section| section.name.clone())
+                });
+                let request = AiTaskRequest {
+                    task: (*task).clone(),
+                    context: original_context,
+                    project_name,
+                    section_name,
+                    available_projects: self.state.projects.clone(),
+                    available_tasks: self.state.all_tasks.clone(),
+                    previous_proposal: Some(proposal.clone()),
+                    revision_request: Some(revision),
+                };
+                self.task_manager
+                    .spawn_ai_proposal_revision(task, proposal, move || async move {
+                        provider.generate_proposal(request).await
+                    });
+                Action::None
+            }
+            Action::AiApplyProposal { task, proposal } => {
+                if let Err(message) = proposal.validate() {
+                    self.dialog.update(Action::ShowDialog(DialogType::Error(message)));
+                    return Action::None;
+                }
+
+                self.dialog.update(Action::ShowDialog(DialogType::AiTaskManagement {
+                    task: task.clone(),
+                    stage: AiAssistStage::Applying,
+                    proposal: Some(proposal.clone()),
+                    report: None,
+                }));
+
+                let sync_service = self.sync_service.clone();
+                let execution_task = task.clone();
+                let execution_proposal = proposal.clone();
+                self.task_manager.spawn_ai_assist_operation(task, proposal, move || async move {
+                    let mut completed_actions = Vec::new();
+                    let mut created_projects = std::collections::HashMap::<String, Uuid>::new();
+                    for action in execution_proposal.enabled_actions_in_execution_order() {
+                        let description = action.description();
+                        let result = match &action.kind {
+                            AiProposedActionKind::CreateProject { reference, name } => {
+                                match sync_service.create_project(name, None).await {
+                                    Ok(uuid) => {
+                                        created_projects.insert(reference.clone(), uuid);
+                                        Ok(())
+                                    }
+                                    Err(error) => Err(error),
+                                }
+                            }
+                            AiProposedActionKind::AddCompletionNote { content } => {
+                                sync_service.add_task_comment(&execution_task.uuid, content).await
+                            }
+                            AiProposedActionKind::CreateTask {
+                                content,
+                                description,
+                                destination,
+                                priority,
+                            } => {
+                                let project_uuid = match resolve_ai_destination(destination, &created_projects) {
+                                    Ok(uuid) => uuid,
+                                    Err(error) => {
+                                        return AiExecutionReport::failed(completed_actions, error);
+                                    }
+                                };
+                                sync_service
+                                    .create_task_rich(RichCreateTaskArgs {
+                                        content: content.clone(),
+                                        description: Some(description.clone()),
+                                        project_uuid: Some(project_uuid),
+                                        priority: Some(*priority),
+                                        ..RichCreateTaskArgs::default()
+                                    })
+                                    .await
+                                    .map(|_| ())
+                            }
+                            AiProposedActionKind::MoveOriginalTask { destination } => {
+                                let project_uuid = match resolve_ai_destination(destination, &created_projects) {
+                                    Ok(uuid) => uuid,
+                                    Err(error) => {
+                                        return AiExecutionReport::failed(completed_actions, error);
+                                    }
+                                };
+                                sync_service
+                                    .update_task_general(
+                                        &execution_task.uuid,
+                                        crate::sync::tasks::GeneralTaskUpdate {
+                                            project_uuid: Some(project_uuid),
+                                            ..Default::default()
+                                        },
+                                    )
+                                    .await
+                            }
+                            AiProposedActionKind::CompleteTask => {
+                                sync_service.complete_task(&execution_task.uuid).await
+                            }
+                        };
+
+                        if let Err(error) = result {
+                            return AiExecutionReport::failed(completed_actions, format!("{description}: {error}"));
+                        }
+                        completed_actions.push(description);
+                    }
+                    AiExecutionReport::success(completed_actions)
+                });
+                Action::None
+            }
             Action::CreateTask {
                 content,
                 project_uuid,
@@ -645,14 +850,17 @@ impl AppComponent {
                 // Find task and cycle its priority
                 let sync_service = self.sync_service.clone();
                 if let Ok(Some(task)) = sync_service.get_task_by_id(&task_id).await {
-                    // Todoist priorities: 1 (Normal), 2 (High), 3 (Higher), 4 (Highest)
+                    // Todoist API priorities: 1 (low) through 4 (urgent).
                     let new_priority = match task.priority {
-                        4 => 1,                 // Highest -> Normal
-                        _ => task.priority + 1, // Normal/High/Higher -> next level
+                        4 => 1,
+                        _ => task.priority + 1,
                     };
                     let task_desc = format!(
-                        "ID {} '{}' (P{} -> P{})",
-                        task_id, task.content, task.priority, new_priority
+                        "ID {} '{}' ({} -> {})",
+                        task_id,
+                        task.content,
+                        crate::priority::TaskPriority::from_todoist(task.priority).label(),
+                        crate::priority::TaskPriority::from_todoist(new_priority).label()
                     );
                     info!("Task: Cycling priority for task {}", task_desc);
                     self.spawn_operation(Operation::Task(TaskOperation::CyclePriority {

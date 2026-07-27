@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use terminalist::entities::task;
+use terminalist::entities::{project, task};
 use terminalist::ui::components::DialogComponent;
-use terminalist::ui::core::{Action, Component, DialogType};
+use terminalist::ui::core::{Action, AiAssistStage, AiProposalPage, Component, DialogType};
 use uuid::Uuid;
 
 fn search_task(content: &str) -> task::Model {
@@ -30,6 +30,19 @@ fn search_task(content: &str) -> task::Model {
 
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
+}
+
+fn follow_up_project() -> project::Model {
+    project::Model {
+        uuid: Uuid::new_v4(),
+        backend_uuid: Uuid::new_v4(),
+        remote_id: "follow-up".to_string(),
+        name: "Follow-up".to_string(),
+        is_favorite: false,
+        is_inbox_project: false,
+        order_index: 0,
+        parent_uuid: None,
+    }
 }
 
 #[test]
@@ -154,5 +167,227 @@ fn test_e_edits_title_from_task_details() {
         }) if actual_task_uuid == task_uuid
             && content == "original title"
             && actual_project_uuid == project_uuid
+    ));
+}
+
+#[test]
+fn test_m_opens_ai_task_management_from_task_details() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Help Mom with ChatGPT");
+    let task_uuid = task.uuid;
+    dialog.dialog_type = Some(DialogType::TaskDetails { task: Box::new(task) });
+
+    let action = dialog.handle_key_events(key(KeyCode::Char('m')));
+
+    assert!(matches!(
+        action,
+        Action::ShowDialog(DialogType::AiTaskManagement {
+            task,
+            stage: AiAssistStage::ContextEntry,
+            proposal: None,
+            report: None,
+        }) if task.uuid == task_uuid
+    ));
+}
+
+#[test]
+fn test_ai_context_submission_requests_generation_and_accepts_result() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Help Mom with ChatGPT");
+    dialog.projects = vec![follow_up_project()];
+    dialog.update(Action::ShowDialog(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ContextEntry,
+        proposal: None,
+        report: None,
+    }));
+
+    for character in "The original need is handled.".chars() {
+        dialog.handle_key_events(key(KeyCode::Char(character)));
+    }
+    let action = dialog.handle_key_events(key(KeyCode::Enter));
+    assert!(matches!(action, Action::AiAssist { .. }));
+
+    let Action::AiAssist { task, .. } = action else {
+        panic!("expected AI assist action");
+    };
+    let proposal =
+        terminalist::ui::core::AiTaskProposal::mock_for(&task, "The original need is handled.", Some(Uuid::new_v4()));
+    let follow_up = dialog.update(Action::AiProposalGenerated { task, proposal });
+    assert!(matches!(follow_up, Action::None));
+    assert!(matches!(
+        dialog.dialog_type,
+        Some(DialogType::AiTaskManagement {
+            stage: AiAssistStage::ProposalReview,
+            proposal: Some(ref proposal),
+            ..
+        }) if proposal.actions.len() == 3
+    ));
+}
+
+#[test]
+fn test_ai_context_up_and_down_follow_wrapped_rows() {
+    let mut dialog = DialogComponent::new();
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(search_task("Example")),
+        stage: AiAssistStage::ContextEntry,
+        proposal: None,
+        report: None,
+    });
+    dialog.input_buffer = "a".repeat(80);
+    dialog.cursor_position = 80;
+
+    dialog.handle_key_events(key(KeyCode::Up));
+    assert_eq!(dialog.cursor_position, 6);
+    dialog.handle_key_events(key(KeyCode::Down));
+    assert_eq!(dialog.cursor_position, 80);
+}
+
+#[test]
+fn test_ai_proposal_actions_can_be_toggled() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Help Mom with ChatGPT");
+    let proposal =
+        terminalist::ui::core::AiTaskProposal::mock_for(&task, "The original need is handled.", Some(Uuid::new_v4()));
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ProposalReview,
+        proposal: Some(proposal),
+        report: None,
+    });
+    dialog.ai_proposal_page = AiProposalPage::Actions;
+
+    dialog.handle_key_events(key(KeyCode::Down));
+    assert_eq!(dialog.ai_selected_action_index, 1);
+    dialog.handle_key_events(key(KeyCode::Char(' ')));
+
+    assert!(matches!(
+        dialog.dialog_type,
+        Some(DialogType::AiTaskManagement {
+            proposal: Some(ref proposal),
+            ..
+        }) if !proposal.actions[1].enabled
+    ));
+}
+
+#[test]
+fn test_ai_proposal_requires_confirmation_before_apply() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Help Mom with ChatGPT");
+    let proposal =
+        terminalist::ui::core::AiTaskProposal::mock_for(&task, "The original need is handled.", Some(Uuid::new_v4()));
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ProposalReview,
+        proposal: Some(proposal),
+        report: None,
+    });
+    dialog.ai_proposal_page = AiProposalPage::Actions;
+
+    assert!(matches!(dialog.handle_key_events(key(KeyCode::Enter)), Action::None));
+    assert!(matches!(
+        dialog.dialog_type,
+        Some(DialogType::AiTaskManagement {
+            stage: AiAssistStage::ApplyConfirmation,
+            ..
+        })
+    ));
+
+    assert!(matches!(
+        dialog.handle_key_events(key(KeyCode::Enter)),
+        Action::AiApplyProposal { .. }
+    ));
+}
+
+#[test]
+fn test_ai_proposal_can_continue_when_unavailable_mock_destination_is_disabled() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Help Mom with ChatGPT");
+    let proposal = terminalist::ui::core::AiTaskProposal::mock_for(&task, "The original need is handled.", None);
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ProposalReview,
+        proposal: Some(proposal),
+        report: None,
+    });
+    dialog.ai_proposal_page = AiProposalPage::Actions;
+
+    assert!(matches!(dialog.handle_key_events(key(KeyCode::Enter)), Action::None));
+    assert!(matches!(
+        dialog.dialog_type,
+        Some(DialogType::AiTaskManagement {
+            stage: AiAssistStage::ApplyConfirmation,
+            ..
+        })
+    ));
+    assert!(dialog.ai_error_message.is_none());
+}
+
+#[test]
+fn test_ai_proposal_pages_navigate_with_arrows_and_enter() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Example");
+    let proposal = terminalist::ui::core::AiTaskProposal::mock_for(&task, "Handled", Some(Uuid::new_v4()));
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ProposalReview,
+        proposal: Some(proposal),
+        report: None,
+    });
+
+    assert_eq!(dialog.ai_proposal_page, AiProposalPage::Recommendation);
+    dialog.handle_key_events(key(KeyCode::Right));
+    assert_eq!(dialog.ai_proposal_page, AiProposalPage::Actions);
+    dialog.handle_key_events(key(KeyCode::Left));
+    assert_eq!(dialog.ai_proposal_page, AiProposalPage::Recommendation);
+    dialog.handle_key_events(key(KeyCode::Enter));
+    assert_eq!(dialog.ai_proposal_page, AiProposalPage::Actions);
+}
+
+#[test]
+fn test_ai_proposal_revision_preserves_context_and_current_proposal() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("Example");
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task.clone()),
+        stage: AiAssistStage::ContextEntry,
+        proposal: None,
+        report: None,
+    });
+    for character in "Original context".chars() {
+        dialog.handle_key_events(key(KeyCode::Char(character)));
+    }
+    let _ = dialog.handle_key_events(key(KeyCode::Enter));
+
+    let proposal = terminalist::ui::core::AiTaskProposal::mock_for(&task, "Handled", Some(Uuid::new_v4()));
+    dialog.dialog_type = Some(DialogType::AiTaskManagement {
+        task: Box::new(task),
+        stage: AiAssistStage::ProposalReview,
+        proposal: Some(proposal.clone()),
+        report: None,
+    });
+    dialog.ai_proposal_page = AiProposalPage::Actions;
+    dialog.handle_key_events(key(KeyCode::Char('r')));
+    assert!(matches!(
+        dialog.dialog_type,
+        Some(DialogType::AiTaskManagement {
+            stage: AiAssistStage::RevisionEntry,
+            ..
+        })
+    ));
+    for character in "Use an existing project".chars() {
+        dialog.handle_key_events(key(KeyCode::Char(character)));
+    }
+    let action = dialog.handle_key_events(key(KeyCode::Enter));
+    assert!(matches!(
+        action,
+        Action::AiReviseProposal {
+            original_context,
+            proposal: returned,
+            revision,
+            ..
+        } if original_context == "Original context"
+            && returned == proposal
+            && revision == "Use an existing project"
     ));
 }

@@ -115,6 +115,151 @@ impl TaskManager {
         self.spawn_task_operation_with_input_policy(operation, description, false, Some(task_uuid))
     }
 
+    pub fn spawn_ai_assist_operation<F, Fut>(
+        &mut self,
+        task: Box<crate::entities::task::Model>,
+        proposal: crate::ui::core::AiTaskProposal,
+        operation: F,
+    ) -> TaskId
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = crate::ui::core::AiExecutionReport> + Send + 'static,
+    {
+        let task_id = self.next_task_id;
+        self.next_task_id += 1;
+        let action_sender = self.action_sender.clone();
+        let dialog_task = task.clone();
+        let dialog_proposal = proposal.clone();
+
+        let handle = tokio::spawn(async move {
+            let report = operation().await;
+            let _ = action_sender.send(Action::RefreshData);
+            let _ = action_sender.send(Action::AiAssistFinished {
+                task: dialog_task,
+                proposal: dialog_proposal,
+                report: report.clone(),
+            });
+            Ok(TaskResult::TaskOperationCompleted(
+                "Applied AI task-management proposal".to_string(),
+            ))
+        });
+
+        self.tasks.insert(
+            task_id,
+            BackgroundTask {
+                id: task_id,
+                handle,
+                description: "Applying AI task-management proposal".to_string(),
+                blocks_input: true,
+                task_uuid: Some(task.uuid),
+                started_at: std::time::Instant::now(),
+            },
+        );
+        task_id
+    }
+
+    pub fn spawn_ai_proposal_generation<F, Fut>(
+        &mut self,
+        task: Box<crate::entities::task::Model>,
+        operation: F,
+    ) -> TaskId
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = anyhow::Result<crate::ui::core::AiTaskProposal>> + Send + 'static,
+    {
+        let task_id = self.next_task_id;
+        self.next_task_id += 1;
+        let action_sender = self.action_sender.clone();
+        let task_for_result = task.clone();
+
+        let handle = tokio::spawn(async move {
+            match operation().await {
+                Ok(proposal) => {
+                    let _ = action_sender.send(Action::AiProposalGenerated {
+                        task: task_for_result,
+                        proposal,
+                    });
+                    Ok(TaskResult::Other("Generated AI task-management proposal".to_string()))
+                }
+                Err(error) => {
+                    let message = error.to_string();
+                    let _ = action_sender.send(Action::AiProposalFailed {
+                        task: task_for_result,
+                        message: message.clone(),
+                    });
+                    Ok(TaskResult::Other(format!(
+                        "AI task-management proposal failed: {message}"
+                    )))
+                }
+            }
+        });
+
+        self.tasks.insert(
+            task_id,
+            BackgroundTask {
+                id: task_id,
+                handle,
+                description: "Generating AI task-management proposal".to_string(),
+                blocks_input: true,
+                task_uuid: Some(task.uuid),
+                started_at: std::time::Instant::now(),
+            },
+        );
+        task_id
+    }
+
+    pub fn spawn_ai_proposal_revision<F, Fut>(
+        &mut self,
+        task: Box<crate::entities::task::Model>,
+        previous_proposal: crate::ui::core::AiTaskProposal,
+        operation: F,
+    ) -> TaskId
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = anyhow::Result<crate::ui::core::AiTaskProposal>> + Send + 'static,
+    {
+        let task_id = self.next_task_id;
+        self.next_task_id += 1;
+        let action_sender = self.action_sender.clone();
+        let task_for_result = task.clone();
+
+        let handle = tokio::spawn(async move {
+            match operation().await {
+                Ok(proposal) => {
+                    let _ = action_sender.send(Action::AiProposalGenerated {
+                        task: task_for_result,
+                        proposal,
+                    });
+                    Ok(TaskResult::Other("Revised AI task-management proposal".to_string()))
+                }
+                Err(error) => {
+                    let message = error.to_string();
+                    let _ = action_sender.send(Action::AiProposalRevisionFailed {
+                        task: task_for_result,
+                        proposal: previous_proposal,
+                        message: message.clone(),
+                    });
+                    Ok(TaskResult::Other(format!(
+                        "AI task-management revision failed: {message}"
+                    )))
+                }
+            }
+        });
+
+        self.tasks.insert(
+            task_id,
+            BackgroundTask {
+                id: task_id,
+                handle,
+                description: "Revising AI task-management proposal".to_string(),
+                blocks_input: true,
+                task_uuid: Some(task.uuid),
+                started_at: std::time::Instant::now(),
+            },
+        );
+        task_id
+    }
+
     fn spawn_task_operation_with_input_policy<F, Fut>(
         &mut self,
         operation: F,

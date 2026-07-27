@@ -195,6 +195,24 @@ impl TodoistBackend {
         }
     }
 
+    fn task_update_args_to_todoist(args: &UpdateTaskArgs) -> crate::todoist::UpdateTaskArgs {
+        crate::todoist::UpdateTaskArgs {
+            content: args.content.clone(),
+            description: args.description.clone(),
+            priority: args.priority,
+            due_string: args.clear_due_date.then(|| "no date".to_string()),
+            due_date: args.due_date.clone(),
+            due_datetime: args.due_datetime.clone(),
+            labels: args.labels.clone(),
+            duration: args
+                .duration
+                .as_deref()
+                .and_then(|duration| duration.split_whitespace().next())
+                .and_then(|amount| amount.parse().ok()),
+            ..Default::default()
+        }
+    }
+
     fn sync_task_to_backend(task: SyncTask) -> Result<BackendTask, BackendError> {
         let project_remote_id = task
             .project_id
@@ -505,12 +523,27 @@ impl Backend for TodoistBackend {
     }
 
     async fn update_task(&self, remote_id: &str, args: UpdateTaskArgs) -> Result<BackendTask, BackendError> {
-        if args.clear_due_date {
+        let move_project_id = args.project_remote_id.clone();
+
+        let todoist_args = Self::task_update_args_to_todoist(&args);
+
+        let updated_task = if todoist_args.has_updates() {
+            Some(
+                self.wrapper
+                    .update_task(remote_id, &todoist_args)
+                    .await
+                    .map_err(|e| BackendError::Network(e.to_string()))?,
+            )
+        } else {
+            None
+        };
+
+        let task = if let Some(project_id) = move_project_id {
             let response = self
                 .client
-                .post(format!("https://api.todoist.com/api/v1/tasks/{remote_id}"))
+                .post(format!("https://api.todoist.com/api/v1/tasks/{remote_id}/move"))
                 .bearer_auth(&self.api_token)
-                .json(&serde_json::json!({ "due_string": "no date" }))
+                .json(&serde_json::json!({ "project_id": project_id }))
                 .send()
                 .await
                 .map_err(|error| BackendError::Network(error.to_string()))?;
@@ -519,38 +552,14 @@ impl Backend for TodoistBackend {
                 let body = response.text().await.unwrap_or_default();
                 return Err(BackendError::Other(format!("Todoist returned {status}: {body}")));
             }
-            let task = response
+            response
                 .json::<crate::todoist::Task>()
                 .await
-                .map_err(|error| BackendError::InvalidData(error.to_string()))?;
-            return Ok(Self::task_to_backend(&task));
-        }
-
-        let todoist_args = crate::todoist::UpdateTaskArgs {
-            content: args.content,
-            description: args.description,
-            priority: args.priority,
-            due_string: None,
-            due_date: args.due_date,
-            due_datetime: args.due_datetime,
-            labels: args.labels,
-            duration: args.duration.as_ref().and_then(|d| {
-                // UpdateTaskArgs.duration is Option<i32> (just the amount)
-                let parts: Vec<&str> = d.split_whitespace().collect();
-                if !parts.is_empty() {
-                    parts[0].parse().ok()
-                } else {
-                    None
-                }
-            }),
-            ..Default::default()
+                .map_err(|error| BackendError::InvalidData(error.to_string()))?
+        } else {
+            updated_task.ok_or_else(|| BackendError::InvalidData("No task updates specified".to_string()))?
         };
 
-        let task = self
-            .wrapper
-            .update_task(remote_id, &todoist_args)
-            .await
-            .map_err(|e| BackendError::Network(e.to_string()))?;
         Ok(Self::task_to_backend(&task))
     }
 
@@ -566,6 +575,19 @@ impl Backend for TodoistBackend {
             .complete_task(remote_id)
             .await
             .map_err(|e| BackendError::Network(e.to_string()))
+    }
+
+    async fn create_task_comment(&self, remote_task_id: &str, content: &str) -> Result<(), BackendError> {
+        let args = crate::todoist::CreateCommentArgs {
+            content: content.to_string(),
+            task_id: Some(remote_task_id.to_string()),
+            ..Default::default()
+        };
+        self.wrapper
+            .create_comment(&args)
+            .await
+            .map(|_| ())
+            .map_err(|error| BackendError::Network(error.to_string()))
     }
 
     async fn reopen_task(&self, remote_id: &str) -> Result<(), BackendError> {
@@ -637,6 +659,30 @@ mod tests {
         let todoist_args = TodoistBackend::task_create_args_to_todoist(args);
 
         assert_eq!(todoist_args.project_id, None);
+    }
+
+    #[test]
+    fn general_update_can_clear_due_date_while_updating_other_fields() {
+        let args = UpdateTaskArgs {
+            content: Some("Clarified task".to_string()),
+            description: Some("Preserved context".to_string()),
+            project_remote_id: Some("destination-project".to_string()),
+            section_remote_id: None,
+            parent_remote_id: None,
+            priority: Some(1),
+            due_date: None,
+            due_datetime: None,
+            clear_due_date: true,
+            duration: None,
+            labels: None,
+        };
+
+        let todoist_args = TodoistBackend::task_update_args_to_todoist(&args);
+
+        assert_eq!(todoist_args.content.as_deref(), Some("Clarified task"));
+        assert_eq!(todoist_args.description.as_deref(), Some("Preserved context"));
+        assert_eq!(todoist_args.priority, Some(1));
+        assert_eq!(todoist_args.due_string.as_deref(), Some("no date"));
     }
 
     #[test]

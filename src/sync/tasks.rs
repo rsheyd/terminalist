@@ -6,6 +6,25 @@ use anyhow::Result;
 use sea_orm::{ActiveValue, EntityTrait, IntoActiveModel, TransactionTrait};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Default)]
+pub struct RichCreateTaskArgs {
+    pub content: String,
+    pub description: Option<String>,
+    pub project_uuid: Option<Uuid>,
+    pub priority: Option<i32>,
+    pub due_date: Option<String>,
+    pub label_uuid: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GeneralTaskUpdate {
+    pub content: Option<String>,
+    pub description: Option<String>,
+    pub project_uuid: Option<Uuid>,
+    pub priority: Option<i32>,
+    pub clear_due_date: bool,
+}
+
 impl SyncService {
     /// Retrieves all tasks for a specific project from local storage.
     ///
@@ -150,15 +169,28 @@ impl SyncService {
         due_date: Option<&str>,
         label_uuid: Option<Uuid>,
     ) -> Result<()> {
+        self.create_task_rich(RichCreateTaskArgs {
+            content: content.to_string(),
+            project_uuid,
+            due_date: due_date.map(str::to_owned),
+            label_uuid,
+            ..RichCreateTaskArgs::default()
+        })
+        .await
+        .map(|_| ())
+    }
+
+    /// Creates a task with the richer fields needed by coordinated proposals.
+    pub async fn create_task_rich(&self, args: RichCreateTaskArgs) -> Result<Uuid> {
         // Resolve local project and label identifiers before releasing the storage lock.
         let (remote_project_id, label_name) = {
             let storage = self.storage.lock().await;
-            let remote_project_id = if let Some(uuid) = project_uuid {
+            let remote_project_id = if let Some(uuid) = args.project_uuid {
                 Some(ProjectRepository::get_remote_id(&storage.conn, &uuid).await?)
             } else {
                 None
             };
-            let label_name = if let Some(uuid) = label_uuid {
+            let label_name = if let Some(uuid) = args.label_uuid {
                 Some(
                     LabelRepository::get_by_id(&storage.conn, &uuid)
                         .await?
@@ -173,13 +205,13 @@ impl SyncService {
 
         // Create task via backend using backend CreateTaskArgs (lock is not held)
         let task_args = crate::backend::CreateTaskArgs {
-            content: content.to_string(),
-            description: None,
+            content: args.content,
+            description: args.description,
             project_remote_id: remote_project_id,
             section_remote_id: None,
             parent_remote_id: None,
-            priority: None,
-            due_date: due_date.map(str::to_owned),
+            priority: args.priority,
+            due_date: args.due_date,
             due_datetime: None,
             duration: None,
             labels: label_name.into_iter().collect(),
@@ -264,7 +296,7 @@ impl SyncService {
         );
         insert.exec(&txn).await?;
 
-        if let Some(label_uuid) = label_uuid {
+        if let Some(label_uuid) = args.label_uuid {
             task_label::Entity::insert(task_label::ActiveModel {
                 task_uuid: ActiveValue::Set(task_uuid),
                 label_uuid: ActiveValue::Set(label_uuid),
@@ -275,6 +307,78 @@ impl SyncService {
 
         txn.commit().await?;
 
+        Ok(task_uuid)
+    }
+
+    /// Adds a Todoist comment to a task. Comments are remote-only reference
+    /// history and are not duplicated in Terminalist's task cache.
+    pub async fn add_task_comment(&self, task_uuid: &Uuid, content: &str) -> Result<()> {
+        let content = content.trim();
+        if content.is_empty() {
+            anyhow::bail!("Task comment cannot be empty");
+        }
+        let remote_id = self.get_task_remote_id(task_uuid).await?;
+        self.get_backend()
+            .await?
+            .create_task_comment(&remote_id, content)
+            .await
+            .map_err(|error| anyhow::anyhow!("Backend error: {}", error))
+    }
+
+    /// Applies several task fields in one backend request and mirrors the
+    /// authoritative returned task into the local cache.
+    pub async fn update_task_general(&self, task_uuid: &Uuid, update: GeneralTaskUpdate) -> Result<()> {
+        let remote_id = self.get_task_remote_id(task_uuid).await?;
+        let remote_project_id = if let Some(project_uuid) = update.project_uuid {
+            let storage = self.storage.lock().await;
+            Some(ProjectRepository::get_remote_id(&storage.conn, &project_uuid).await?)
+        } else {
+            None
+        };
+        let task_args = crate::backend::UpdateTaskArgs {
+            content: update.content,
+            description: update.description,
+            project_remote_id: remote_project_id,
+            section_remote_id: None,
+            parent_remote_id: None,
+            priority: update.priority,
+            due_date: None,
+            due_datetime: None,
+            clear_due_date: update.clear_due_date,
+            duration: None,
+            labels: None,
+        };
+        let updated = self
+            .get_backend()
+            .await?
+            .update_task(&remote_id, task_args)
+            .await
+            .map_err(|error| anyhow::anyhow!("Backend error: {}", error))?;
+
+        let storage = self.storage.lock().await;
+        let Some(local) = TaskRepository::get_by_id(&storage.conn, task_uuid).await? else {
+            anyhow::bail!("Task disappeared from local storage after remote update: {}", task_uuid);
+        };
+        let project_uuid = Self::lookup_project_uuid(
+            &storage.conn,
+            &self.backend_uuid,
+            &updated.project_remote_id,
+            "task update",
+        )
+        .await?;
+        let section_uuid =
+            Self::lookup_section_uuid(&storage.conn, &self.backend_uuid, updated.section_remote_id.as_ref()).await?;
+        let mut active_model = local.into_active_model();
+        active_model.content = ActiveValue::Set(updated.content);
+        active_model.description = ActiveValue::Set(updated.description);
+        active_model.project_uuid = ActiveValue::Set(project_uuid);
+        active_model.section_uuid = ActiveValue::Set(section_uuid);
+        active_model.priority = ActiveValue::Set(updated.priority);
+        active_model.due_date = ActiveValue::Set(updated.due_date);
+        active_model.due_datetime = ActiveValue::Set(updated.due_datetime);
+        active_model.is_recurring = ActiveValue::Set(updated.is_recurring);
+        active_model.duration = ActiveValue::Set(updated.duration);
+        TaskRepository::update(&storage.conn, active_model).await?;
         Ok(())
     }
 

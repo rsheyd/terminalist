@@ -25,7 +25,7 @@ pub const SUCCESS_PROJECT_UPDATED: &str = "✅ Project updated";
 pub const SUCCESS_LABEL_CREATED: &str = "✅ Label created";
 pub const SUCCESS_LABEL_DELETED: &str = "✅ Label deleted";
 pub const SUCCESS_LABEL_UPDATED: &str = "✅ Label updated";
-pub const SUCCESS_TASK_PRIORITY_UPDATED: &str = "✅ Task priority updated to P";
+pub const SUCCESS_TASK_PRIORITY_UPDATED: &str = "✅ Task priority updated";
 pub const SUCCESS_TASK_RESTORED: &str = "✅ Task restored";
 pub const SUCCESS_SYNC_COMPLETED: &str = "Sync completed successfully";
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI Task Management** - Generate review-first OpenAI proposals from task details, let the model inspect cached projects and tasks through read-only tools, revise recommendations and proposed actions, and apply only explicitly confirmed Todoist changes
 - **Incremental Todoist Sync** - Persist Todoist Sync API tokens and retrieve only remote changes after the initial full synchronization
 - **Smart View Bar** - Show Today, Agenda, Tomorrow, Upcoming, and Trash in an always-visible top navigation bar with keyboard and mouse navigation
 - **Persistent Sidebar Rail** - Collapse Projects & Labels to a clickable three-column rail and restore its last state and expanded width on startup
@@ -16,12 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Contextual Task Titles** - Identify the active smart view, project, or label in the task-pane title
 
 ### Changed
+- **Named Priorities** - Present priorities as low, medium, high, and urgent while retaining Todoist's numeric representation only at the integration boundary
 - **Responsive Refreshes** - Keep navigation and read-only interactions available while post-sync data reloads finish, blocking only mutations
 - **Transactional Sync Tokens** - Commit Todoist deltas and their replacement sync tokens together, with automatic full-sync recovery for rejected tokens
 - **Focused Sidebar** - Reserve the sidebar for projects and labels while Left/Right cycles smart views
 - **Sidebar Naming** - Rename the navigation panel to Projects & Labels
 
 ### Fixed
+- **AI Proposal Layout** - Keep wrapped recommendations, action lists, scroll indicators, cursors, and responsive command footers visible within the dialog
 - **Empty Trash Navigation** - Keep the permanently available Trash smart view selected when it contains no tasks
 
 ## [0.5.0] - 2026-03-25

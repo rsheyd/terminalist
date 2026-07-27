@@ -1,6 +1,6 @@
 # Post-PR #188 Branch Changes
 
-Last updated: July 24, 2026
+Last updated: July 27, 2026
 
 ## Purpose
 
@@ -104,6 +104,28 @@ Validation:
 
 - `cargo fmt --all -- --check`
 - `cargo test` (115 tests passed)
+
+### AI Task Management
+
+- Added `Manage task with AI…` to Task Details and a review-first AI Task Management
+  dialog backed by OpenAI.
+- Let OpenAI request cached project and task context through bounded, read-only tools.
+- Added proposal actions for completion notes, project and successor-task creation,
+  moving the original task, and completing it.
+- Split proposal review into scrollable Recommendation and Proposed Actions pages.
+- Added action enable/disable controls, explicit apply confirmation, partial-failure
+  reporting, and an AI revision flow that preserves the original context and proposal.
+- Presented priorities as low, medium, high, and urgent while converting to Todoist API
+  values only at the integration boundary.
+- Added wrapped-row action scrolling, responsive footers, visible text cursors, action
+  counts, progress cues, and scrollbars.
+- Documented OpenAI configuration and keyboard controls.
+- Advanced the development version to `0.7.0-dev.1`.
+
+Validation:
+
+- `cargo fmt --all -- --check`
+- `cargo test`
 
 ## Future pull request outline
 

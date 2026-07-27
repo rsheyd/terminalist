@@ -1,6 +1,6 @@
 # AI Task Management Plan
 
-Status: proposed
+Status: Increment 4 contextual read-only tools and general project actions implemented
 
 ## Purpose
 
@@ -13,7 +13,7 @@ purpose but may leave behind an optional future project. For example, the
 assistant might propose:
 
 - adding a completion note to the selected task;
-- creating an undated P4 successor in a `Someday` project;
+- creating an undated low-priority successor in an appropriate existing or proposed project;
 - preserving research links and conditions for reconsidering the work; and
 - completing the original task.
 
@@ -116,7 +116,7 @@ Add:
 - a general task-update operation;
 - richer task creation with description, project, and priority;
 - Todoist comment creation;
-- destination-project resolution, including `Someday`; and
+- general existing and newly proposed project destinations; and
 - a composite proposal executor.
 
 Comments are preferred for completion history. If comment support is deferred,
@@ -174,9 +174,9 @@ Before displaying or applying a proposal:
 Todoist does not make this multi-action workflow atomic. Execute approved
 actions in the following order:
 
-1. Preserve context on the original task.
-2. Create successor tasks.
-3. Apply project, priority, description, and scheduling changes.
+1. Create approved projects.
+2. Preserve context on the original task.
+3. Create successor tasks and move the original when approved.
 4. Complete the original task last.
 
 Stop on failure and report completed and pending actions. Completing the
@@ -216,10 +216,42 @@ cargo test
 
 ### Increment 2: Proposal Execution
 
-- Add richer Todoist task and comment mutations.
-- Implement typed proposal validation and ordered execution.
-- Apply user-approved mock proposals.
-- Test partial failures and local-cache reconciliation.
+- Added richer Todoist task and comment mutations.
+- Implemented typed proposal validation and ordered execution.
+
+### Increment 3: Live Proposal Generation
+
+- Uses the OpenAI Responses API with strict structured output and response
+  storage disabled.
+- Defaults to `gpt-5.6-sol`.
+- Reads the API key from `OPENAI_VALERIA_API_KEY`. Only this environment
+  variable name is stored; the credential value remains outside Terminalist.
+- Treats this key name as a temporary personal setup so a dedicated key can be
+  substituted later through configuration.
+- Generates proposals asynchronously and keeps all Todoist mutations behind
+  the existing review and confirmation steps.
+- User-approved mock proposals can now be applied after a separate confirmation.
+- Partial failures stop execution and report completed actions; completion remains last.
+
+### Increment 4: Contextual Tools and General Projects
+
+- OpenAI can request `list_projects`, `list_tasks`, or `search_tasks` during
+  proposal generation instead of receiving the whole local cache up front.
+- `list_tasks` accepts an optional project UUID; omitting it lists tasks across
+  all projects. Every tool response is read-only and bounded.
+- Proposals can select an existing project returned by a tool, propose a new
+  project, create a related task in either destination, or move the original
+  task.
+- Existing project identifiers and proposed-project references are validated
+  before review.
+- Approved projects are created before dependent task actions, and completion
+  remains last.
+- Proposed Actions shows the total action count, selection progress, a
+  scrollbar, and an explicit indication when more actions remain below.
+- `r` opens a revision request editor. OpenAI receives the original context,
+  current proposal, and requested changes, then returns a complete replacement
+  proposal for review. Revision remains read-only and restores the previous
+  proposal if generation fails.
 
 ### Increment 3: AI Integration
 
@@ -237,12 +269,12 @@ Treat the feature as an experiment. After several real uses, evaluate:
 
 - whether proposals save meaningful effort;
 - whether users commonly edit or reject particular action types;
-- whether `Someday` decisions stay understandable in Todoist;
+- whether project and future-work decisions stay understandable in Todoist;
 - whether the feature preserves enough context;
 - whether model latency and cost feel proportionate; and
 - whether repeated patterns should become deterministic, non-AI commands.
 
-Workflow semantics—what it means to complete, defer, move to `Someday`, or
+Workflow semantics—what it means to complete, defer, move to another project, or
 create a successor task—belong in the personal productivity-system
 documentation. Terminalist should implement those decisions as explicit,
 visible, reversible Todoist mutations.
