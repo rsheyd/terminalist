@@ -565,8 +565,13 @@ impl Component for DialogComponent {
         }
 
         match &self.dialog_type {
-            Some(DialogType::TaskDetails { .. }) => match key.code {
+            Some(DialogType::TaskDetails { task }) => match key.code {
                 KeyCode::Esc | KeyCode::Enter => Action::HideDialog,
+                KeyCode::Char('e') => Action::ShowDialog(DialogType::TaskEdit {
+                    task_uuid: task.uuid,
+                    content: task.content.clone(),
+                    project_uuid: task.project_uuid,
+                }),
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.scroll_up();
                     Action::None

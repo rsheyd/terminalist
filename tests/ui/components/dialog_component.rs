@@ -134,3 +134,25 @@ fn test_enter_has_no_search_action() {
 
     assert!(matches!(dialog.handle_key_events(key(KeyCode::Enter)), Action::None));
 }
+
+#[test]
+fn test_e_edits_title_from_task_details() {
+    let mut dialog = DialogComponent::new();
+    let task = search_task("original title");
+    let task_uuid = task.uuid;
+    let project_uuid = task.project_uuid;
+    dialog.dialog_type = Some(DialogType::TaskDetails { task: Box::new(task) });
+
+    let action = dialog.handle_key_events(key(KeyCode::Char('e')));
+
+    assert!(matches!(
+        action,
+        Action::ShowDialog(DialogType::TaskEdit {
+            task_uuid: actual_task_uuid,
+            content,
+            project_uuid: actual_project_uuid,
+        }) if actual_task_uuid == task_uuid
+            && content == "original title"
+            && actual_project_uuid == project_uuid
+    ));
+}

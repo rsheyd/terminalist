@@ -77,7 +77,7 @@ pub fn render_task_details_dialog(
     let details = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
         .scroll((clamped_offset as u16, 0));
-    let instructions = Paragraph::new("Esc close • j/k or ↑/↓ scroll")
+    let instructions = Paragraph::new("e edit title • Esc close • j/k or ↑/↓ scroll")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center);
 

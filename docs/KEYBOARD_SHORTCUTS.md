@@ -18,6 +18,7 @@ selected view without moving keyboard focus away from the task list.
 - **`x`** Mark or unmark a task for bulk actions
 - **`Esc`** Clear all marked tasks
 - **`Enter`** Open the selected task's details dialog
+- **`e`** Edit the selected task title; also works from the task details dialog
 - **`Space`** Toggle completion for marked tasks, or the current task when none are marked
 - **`a`** Create new task
 - **`d`** Delete selected task (with confirmation)
@@ -83,7 +84,7 @@ currently highlighted task.
   - Takes remaining width after projects list
   - Displays task content, priority, labels, and status
 - **Help Panel**: Modal overlay accessible with `?` key
-- **Task Details**: Read-only modal dialog showing the full task title, description, project, priority, due information, and status
+- **Task Details**: Modal dialog showing the full task title, description, project, priority, due information, and status; press `e` to edit the title
 - **Shortcut Bar**: Common controls shown along the bottom (configurable with `shortcut_bar_visible`)
 
 ## Agenda
