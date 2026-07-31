@@ -1,6 +1,6 @@
 # Post-PR #188 Branch Changes
 
-Last updated: July 27, 2026
+Last updated: July 31, 2026
 
 ## Purpose
 
@@ -10,6 +10,54 @@ scope, testing summary, and starting point for a future pull request.
 
 Do not include PR #188's existing consolidated work here. Record only changes introduced
 after this branch diverged from `codex/test-full-stack`.
+
+## Rough upstream PR roadmap
+
+This is a provisional decomposition of the fork's integrated work into reviewable upstream
+PRs. Before preparing each branch, compare it with the latest `upstream/main`, remove anything
+already implemented there, and adjust boundaries when that produces a smaller or more coherent
+change. Prefer independent PRs; stack a PR only when its code genuinely requires an earlier
+unmerged change.
+
+1. **Git revision in version output** — identify locally installed development builds and
+   refresh the metadata when Git or source state changes. Draft PR
+   [#201](https://github.com/romaintb/terminalist/pull/201).
+2. **Persistent cache lifecycle** — preserve usable cached data across startup and sync
+   failures, migrate existing databases, and replace remote snapshots transactionally.
+3. **Typed background operations and stable IDs** — replace delimiter-encoded commands with
+   typed operations and use UUIDs for project and label selections.
+4. **Versioned view snapshots** — reject stale background results, retain the last accepted
+   view on failure, and cover rapid-navigation races. Likely depends on item 3.
+5. **Navigation and bulk task workflows** — improve pane navigation, sidebar sizing and counts,
+   marked-task actions, processing feedback, and relevant shortcut-bar behavior.
+6. **Search focus and responsive completion** — make query/results focus explicit, keep search
+   and navigation responsive during completion, suppress duplicate operations, and refresh open
+   searches after task changes. May depend on items 3–5.
+7. **Completion-history reconciliation and styling** — retain tasks completed today, use
+   Todoist's authoritative completion timestamps, count only remaining active tasks, and keep
+   selected completed rows readable.
+8. **Context-aware task creation** — inherit Today, Tomorrow, project, Inbox, and label context,
+   including omitting Todoist's project field for Inbox tasks.
+9. **Recoverable local Trash** — delete remotely before tombstoning locally, conditionally show
+   Trash, restore tasks by recreating them, expire old tombstones, and support Empty Trash.
+   Likely builds on items 3, 5, and 8.
+10. **Agenda and due-time editing** — schedule incomplete Today tasks chronologically, preserve
+    explicit times, suggest local times, set or clear due times, and keep long dialog input
+    visible. Likely builds on items 4–6.
+11. **Task Details and basic editing** — add the scrollable Task Details dialog, use `Enter` for
+    details and `Space` for completion, then add focused title and description editing.
+12. **Modeless and smart-view navigation** — keep the task list active, add keyboard navigation
+    for projects and labels, and introduce the Today/Agenda/Tomorrow/Upcoming/Trash top bar.
+13. **Persistent Projects & Labels rail** — add expanded and collapsed rail states, contextual
+    task-pane titles, mouse behavior, and persisted UI preferences. Likely depends on item 12.
+14. **Responsive incremental Todoist sync** — adopt Sync API tokens, apply deltas
+    transactionally, recover from rejected tokens, and keep read-only UI interactions responsive
+    while blocking mutations against stale state. Re-audit its relationship with items 2, 4,
+    and 9 before deciding whether to stack it.
+15. **AI task management** — add the review-first OpenAI proposal workflow, bounded read-only
+    context tools, selectable actions, revision and confirmation flows, priority conversion, and
+    partial-failure reporting. Keep this last until its task-management and UI prerequisites are
+    available upstream.
 
 ## Changes
 
@@ -126,6 +174,27 @@ Validation:
 
 - `cargo fmt --all -- --check`
 - `cargo test`
+
+## Upstream contribution workflow
+
+Keep the fork's `main` as the complete personal version of Terminalist. It is the daily-use
+branch and may continue receiving small changes without waiting for PR #188's work to land
+upstream. Keep `codex/post-pr188` as a development or reference branch while it remains
+useful.
+
+Prepare smaller upstream contributions separately:
+
+1. Fetch the latest `upstream/main` without replacing the fork's personal `main`.
+2. Create each proposed PR branch directly from `upstream/main`.
+3. Copy or reconstruct only the relevant commits and code from the personal branches.
+4. Resolve upstream conflicts within that focused feature slice and validate it independently.
+5. Submit the focused branch to upstream. Base it on another proposed branch only when the
+   change genuinely depends on that earlier PR; otherwise keep it independently mergeable.
+
+This keeps the installed personal version usable while PR #188 is gradually decomposed into
+reviewable upstream changes. Periodically integrate new upstream changes into the personal
+`main`, but do not use the personal `main` itself as the base of an upstream PR because it
+contains the full integrated feature set and later work.
 
 ## Future pull request outline
 
