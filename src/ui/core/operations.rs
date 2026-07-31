@@ -27,6 +27,10 @@ pub enum TaskOperation {
         task_uuid: Uuid,
         content: String,
     },
+    EditDescription {
+        task_uuid: Uuid,
+        description: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +70,7 @@ impl Operation {
             },
             Self::Task(TaskOperation::Create { .. }) => "Create task",
             Self::Task(TaskOperation::Edit { .. }) => "Edit task",
+            Self::Task(TaskOperation::EditDescription { .. }) => "Edit task description",
             Self::Project(ProjectOperation::Create { .. }) => "Create project",
             Self::Project(ProjectOperation::Edit { .. }) => "Edit project",
             Self::Project(ProjectOperation::Delete(_)) => "Delete project",
@@ -128,6 +133,13 @@ impl Operation {
                 .context(description.clone())?,
             Self::Task(TaskOperation::Edit { task_uuid, content }) => sync_service
                 .update_task_content(&task_uuid, &content)
+                .await
+                .context(description.clone())?,
+            Self::Task(TaskOperation::EditDescription {
+                task_uuid,
+                description: task_description,
+            }) => sync_service
+                .update_task_description(&task_uuid, &task_description)
                 .await
                 .context(description.clone())?,
             Self::Project(ProjectOperation::Create { name, parent_uuid }) => sync_service

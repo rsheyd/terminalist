@@ -420,6 +420,38 @@ impl SyncService {
         Ok(())
     }
 
+    /// Update a task description remotely before mirroring it in local storage.
+    pub async fn update_task_description(&self, task_uuid: &Uuid, description: &str) -> Result<()> {
+        let remote_id = self.get_task_remote_id(task_uuid).await?;
+        let task_args = crate::backend::UpdateTaskArgs {
+            content: None,
+            description: Some(description.to_string()),
+            project_remote_id: None,
+            section_remote_id: None,
+            parent_remote_id: None,
+            priority: None,
+            due_date: None,
+            due_datetime: None,
+            clear_due_date: false,
+            duration: None,
+            labels: None,
+        };
+        self.get_backend()
+            .await?
+            .update_task(&remote_id, task_args)
+            .await
+            .map_err(|e| anyhow::anyhow!("Backend error: {}", e))?;
+
+        let storage = self.storage.lock().await;
+        if let Some(task) = TaskRepository::get_by_id(&storage.conn, task_uuid).await? {
+            let mut active_model: task::ActiveModel = task.into_active_model();
+            active_model.description = ActiveValue::Set(Some(description.to_string()));
+            TaskRepository::update(&storage.conn, active_model).await?;
+        }
+
+        Ok(())
+    }
+
     /// Update task due date
     pub async fn update_task_due_date(&self, task_uuid: &Uuid, due_date: Option<&str>) -> Result<()> {
         // Look up the task's remote_id for backend call

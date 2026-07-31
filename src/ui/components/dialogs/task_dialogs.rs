@@ -73,10 +73,11 @@ pub fn render_task_details_dialog(
     let details = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
         .scroll((clamped_offset as u16, 0));
-    let instructions = Paragraph::new("e edit title • m manage with AI • Esc close\nj/k or ↑/↓ scroll")
-        .style(Style::default().fg(Color::Gray))
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true });
+    let instructions =
+        Paragraph::new("e edit title • d edit description • m manage with AI\nEsc close • j/k or ↑/↓ scroll")
+            .style(Style::default().fg(Color::Gray))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
 
     f.render_widget(block, dialog_area);
     f.render_widget(details, content_area);
@@ -90,6 +91,38 @@ pub fn render_task_details_dialog(
             .thumb_symbol("▐");
         f.render_stateful_widget(scrollbar, content_area, scrollbar_state);
     }
+}
+
+pub fn render_task_description_edit_dialog(f: &mut Frame, area: Rect, input_buffer: &str, cursor_position: usize) {
+    let dialog_area = LayoutManager::centered_rect(70, 55, area);
+    f.render_widget(Clear, dialog_area);
+
+    let block = common::create_dialog_block("Edit Description", Color::Cyan);
+    let inner = block.inner(dialog_area);
+    let layout = Layout::vertical([Constraint::Min(3), Constraint::Length(1)])
+        .margin(1)
+        .split(inner);
+    let input_area = layout[0];
+    let input_width = input_area.width.saturating_sub(2).max(1);
+    let (rendered, cursor_row, cursor_column) =
+        common::multiline_input_layout(input_buffer, cursor_position, input_width);
+    let input = Paragraph::new(rendered)
+        .block(Block::default().borders(Borders::ALL).title(" Description "))
+        .wrap(Wrap { trim: false });
+    let instructions = common::create_instructions_paragraph(&[
+        ("Enter", Color::Green, " Save"),
+        shortcuts::SEPARATOR,
+        shortcuts::ESC_CANCEL,
+    ]);
+
+    f.render_widget(block, dialog_area);
+    f.render_widget(input, input_area);
+    f.render_widget(instructions, layout[1]);
+
+    f.set_cursor_position((
+        input_area.x + 1 + cursor_column,
+        input_area.y + 1 + cursor_row.min(input_area.height.saturating_sub(3)),
+    ));
 }
 
 #[allow(clippy::too_many_arguments)]

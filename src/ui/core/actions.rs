@@ -303,6 +303,10 @@ pub enum Action {
         task_uuid: Uuid,
         content: String,
     },
+    EditTaskDescription {
+        task_uuid: Uuid,
+        description: String,
+    },
     AiAssist {
         task: Box<task::Model>,
         context: String,
@@ -416,6 +420,7 @@ impl Action {
                 | Self::SetTasksDueDate { .. }
                 | Self::CreateTask { .. }
                 | Self::EditTask { .. }
+                | Self::EditTaskDescription { .. }
                 | Self::AiApplyProposal { .. }
                 | Self::RestoreTask(_)
                 | Self::EmptyTrash
@@ -428,6 +433,7 @@ impl Action {
                 | Self::ShowDialog(
                     DialogType::TaskCreation { .. }
                         | DialogType::TaskEdit { .. }
+                        | DialogType::TaskDescriptionEdit { .. }
                         | DialogType::TaskTime { .. }
                         | DialogType::ProjectCreation
                         | DialogType::ProjectEdit { .. }
@@ -573,6 +579,10 @@ pub enum DialogType {
         task_uuid: Uuid,
         content: String,
         project_uuid: Uuid,
+    },
+    TaskDescriptionEdit {
+        task_uuid: Uuid,
+        description: String,
     },
     TaskTime {
         task_uuid: Uuid,

@@ -171,6 +171,49 @@ fn test_e_edits_title_from_task_details() {
 }
 
 #[test]
+fn test_d_edits_description_from_task_details() {
+    let mut dialog = DialogComponent::new();
+    let mut task = search_task("original title");
+    task.description = Some("original description".to_string());
+    let task_uuid = task.uuid;
+    dialog.dialog_type = Some(DialogType::TaskDetails { task: Box::new(task) });
+
+    let action = dialog.handle_key_events(key(KeyCode::Char('d')));
+
+    assert!(matches!(
+        action,
+        Action::ShowDialog(DialogType::TaskDescriptionEdit {
+            task_uuid: actual_task_uuid,
+            description,
+        }) if actual_task_uuid == task_uuid && description == "original description"
+    ));
+}
+
+#[test]
+fn test_description_edit_is_prefilled_and_can_be_cleared() {
+    let mut dialog = DialogComponent::new();
+    let task_uuid = Uuid::new_v4();
+    dialog.update(Action::ShowDialog(DialogType::TaskDescriptionEdit {
+        task_uuid,
+        description: "old description".to_string(),
+    }));
+
+    assert_eq!(dialog.input_buffer, "old description");
+    for _ in 0.."old description".chars().count() {
+        dialog.handle_key_events(key(KeyCode::Backspace));
+    }
+    let action = dialog.handle_key_events(key(KeyCode::Enter));
+
+    assert!(matches!(
+        action,
+        Action::EditTaskDescription {
+            task_uuid: actual_task_uuid,
+            description,
+        } if actual_task_uuid == task_uuid && description.is_empty()
+    ));
+}
+
+#[test]
 fn test_m_opens_ai_task_management_from_task_details() {
     let mut dialog = DialogComponent::new();
     let task = search_task("Help Mom with ChatGPT");

@@ -222,6 +222,14 @@ impl DialogComponent {
                     Action::None
                 }
             }
+            Some(DialogType::TaskDescriptionEdit { task_uuid, .. }) => {
+                let action = Action::EditTaskDescription {
+                    task_uuid: *task_uuid,
+                    description: self.input_buffer.clone(),
+                };
+                self.clear_dialog();
+                action
+            }
             Some(DialogType::TaskTime { task_uuid, .. }) => {
                 match crate::utils::datetime::today_at_time(&self.input_buffer) {
                     Ok(due_datetime) => {
@@ -928,6 +936,10 @@ impl Component for DialogComponent {
                     content: task.content.clone(),
                     project_uuid: task.project_uuid,
                 }),
+                KeyCode::Char('d') => Action::ShowDialog(DialogType::TaskDescriptionEdit {
+                    task_uuid: task.uuid,
+                    description: task.description.clone().unwrap_or_default(),
+                }),
                 KeyCode::Char('m') => Action::ShowDialog(DialogType::AiTaskManagement {
                     task: task.clone(),
                     stage: AiAssistStage::ContextEntry,
@@ -1353,6 +1365,10 @@ impl Component for DialogComponent {
                         self.input_buffer = content.clone();
                         self.cursor_position = content.chars().count();
                     }
+                    DialogType::TaskDescriptionEdit { description, .. } => {
+                        self.input_buffer = description.clone();
+                        self.cursor_position = description.chars().count();
+                    }
                     DialogType::TaskTime { current_time, .. } => {
                         self.input_buffer = current_time.clone().unwrap_or_default();
                         self.cursor_position = self.input_buffer.chars().count();
@@ -1448,6 +1464,9 @@ impl Component for DialogComponent {
                 }
                 DialogType::TaskCreation { .. } => self.render_task_creation_dialog(f, rect),
                 DialogType::TaskEdit { .. } => self.render_task_edit_dialog(f, rect),
+                DialogType::TaskDescriptionEdit { .. } => {
+                    task_dialogs::render_task_description_edit_dialog(f, rect, &self.input_buffer, self.cursor_position)
+                }
                 DialogType::TaskTime { .. } => {
                     task_dialogs::render_task_time_dialog(f, rect, &self.input_buffer, self.cursor_position)
                 }

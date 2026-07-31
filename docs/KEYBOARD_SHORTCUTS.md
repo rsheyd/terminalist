@@ -19,6 +19,7 @@ selected view without moving keyboard focus away from the task list.
 - **`Esc`** Clear all marked tasks
 - **`Enter`** Open the selected task's details dialog
 - **`e`** Edit the selected task title; also works from the task details dialog
+- **`d`** Edit the task description from the task details dialog
 - **`m`** Open `Manage task with AI…` from the task details dialog; proposals are reviewed and confirmed before Todoist changes
 - **`Space`** Toggle completion for marked tasks, or the current task when none are marked
 - **`a`** Create new task
@@ -85,7 +86,7 @@ currently highlighted task.
   - Takes remaining width after projects list
   - Displays task content, priority, labels, and status
 - **Help Panel**: Modal overlay accessible with `?` key
-- **Task Details**: Modal dialog showing the full task title, description, project, priority, due information, and status; press `e` to edit the title or `m` to open `AI Task Management`
+- **Task Details**: Modal dialog showing the full task title, description, project, priority, due information, and status; press `e` to edit the title, `d` to edit the description, or `m` to open `AI Task Management`
 - **AI proposal review**: After generation, use `←`/`→` to switch between the scrollable Recommendation page and the Proposed Actions page. On Proposed Actions, use `j`/`k` or `↑`/`↓` to select, `Space` to enable or disable, `r` to request a revised proposal, and `Enter` to continue.
 - **Shortcut Bar**: Common controls shown along the bottom (configurable with `shortcut_bar_visible`)
 

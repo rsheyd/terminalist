@@ -71,6 +71,7 @@ fn details_dialog_renders_full_title_and_metadata() {
     assert!(rendered.contains("A full task title that should remain visible"));
     assert!(rendered.contains("Project: Terminalist"));
     assert!(rendered.contains("Useful description"));
+    assert!(rendered.contains("d edit description"));
     assert!(rendered.contains("m manage with AI"));
     assert!(rendered.contains("j/k or ↑/↓ scroll"));
 }

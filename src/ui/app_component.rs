@@ -1000,6 +1000,14 @@ impl AppComponent {
                 self.spawn_operation(Operation::Task(TaskOperation::Edit { task_uuid, content }));
                 Action::None
             }
+            Action::EditTaskDescription { task_uuid, description } => {
+                info!("Task: Editing description for task UUID {}", task_uuid);
+                self.spawn_operation(Operation::Task(TaskOperation::EditDescription {
+                    task_uuid,
+                    description,
+                }));
+                Action::None
+            }
             Action::RestoreTask(task_id) => {
                 info!("Task: Restoring task {}", task_id);
                 self.spawn_operation(Operation::Task(TaskOperation::Restore(task_id)));
