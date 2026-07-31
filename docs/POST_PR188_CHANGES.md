@@ -19,8 +19,9 @@ already implemented there, and adjust boundaries when that produces a smaller or
 change. Prefer independent PRs; stack a PR only when its code genuinely requires an earlier
 unmerged change.
 
-1. **Git revision in version output** — identify locally installed development builds and
-   refresh the metadata when Git or source state changes. Draft PR
+1. **Development version convention** — document `-dev.N` versions for identifiable
+   development builds without adding build-time Git metadata. Draft PR
+   [#202](https://github.com/romaintb/terminalist/pull/202), replacing the proposal in
    [#201](https://github.com/romaintb/terminalist/pull/201).
 2. **Persistent cache lifecycle** — preserve usable cached data across startup and sync
    failures, migrate existing databases, and replace remote snapshots transactionally.

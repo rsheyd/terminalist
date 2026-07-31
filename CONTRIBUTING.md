@@ -43,11 +43,10 @@ cargo install --path . --locked --force
 terminalist --version
 ```
 
-The version output includes the Git commit and indicates whether the build
-contained uncommitted changes:
+The version output identifies the current development snapshot:
 
 ```text
-terminalist 0.6.0-dev.1 (74f4f78, dirty)
+terminalist 0.7.0-dev.1
 ```
 
 Run `command -v terminalist` if the command does not appear to use the expected
@@ -69,8 +68,7 @@ from the latest stable release.
 Increment the `dev.N` number when publishing or sharing another meaningful
 development snapshot. Use `0.6.0-rc.1`, `rc.2`, and so on for release
 candidates, then remove the suffix for the final `0.6.0` release. Ordinary
-commits within the same snapshot do not require a version bump because
-`terminalist --version` also identifies the exact Git revision.
+commits within the same snapshot do not require a version bump.
 
 Every version change must update the semantic version in `Cargo.toml`, run
 `cargo check` to update `Cargo.lock`, and commit both files together. Keep
