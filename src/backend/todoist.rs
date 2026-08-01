@@ -299,6 +299,14 @@ impl Backend for TodoistBackend {
         Ok(all_tasks)
     }
 
+    async fn fetch_task(&self, remote_id: &str) -> Result<BackendTask, BackendError> {
+        self.wrapper
+            .get_task(remote_id)
+            .await
+            .map(|task| Self::task_to_backend(&task))
+            .map_err(|e| BackendError::Network(e.to_string()))
+    }
+
     async fn fetch_completed_tasks(&self, since: &str, until: &str) -> Result<Vec<BackendTask>, BackendError> {
         let mut all_tasks = Vec::new();
         let mut cursor = None;

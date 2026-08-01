@@ -562,10 +562,11 @@ impl SyncService {
         Ok(())
     }
 
-    /// Marks a task as completed remotely and caches Todoist's completion timestamp.
+    /// Completes a task remotely and reconciles the resulting Todoist state.
     ///
-    /// This method completes the task remotely (which automatically handles subtasks),
-    /// then reads the completed-task feed so the crossed-out task remains visible today.
+    /// Regular tasks are read back from completion history so their crossed-out state remains
+    /// visible today. Recurring tasks remain active in Todoist, so their newly scheduled
+    /// occurrence is read back from the active-task endpoint instead.
     ///
     /// # Arguments
     /// * `task_uuid` - The local UUID of the task to complete
@@ -573,15 +574,40 @@ impl SyncService {
     /// # Errors
     /// Returns an error if the backend call fails or local storage update fails
     pub async fn complete_task(&self, task_uuid: &Uuid) -> Result<()> {
-        // Look up the task's remote_id for backend call
-        let remote_id = self.get_task_remote_id(task_uuid).await?;
+        let local_task = self
+            .get_task_by_id(task_uuid)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Task not found in local storage: {}", task_uuid))?;
+        let remote_id = local_task.remote_id.clone();
 
-        // Complete the task remotely, then read Todoist's authoritative completion timestamp.
         let backend = self.get_backend().await?;
         backend
             .complete_task(&remote_id)
             .await
             .map_err(|e| anyhow::anyhow!("Backend error: {}", e))?;
+
+        if local_task.is_recurring {
+            // A recurring series normally remains active under the same ID with a new due date.
+            // If this was its final occurrence, however, the active lookup fails and the task
+            // must be reconciled through completion history like an ordinary task.
+            if let Ok(next_occurrence) = backend.fetch_task(&remote_id).await {
+                validate_recurring_occurrence(&remote_id, &next_occurrence)?;
+
+                let storage = self.storage.lock().await;
+                if let Some(task) = TaskRepository::get_by_id(&storage.conn, task_uuid).await? {
+                    let mut active_model: task::ActiveModel = task.into_active_model();
+                    active_model.due_date = ActiveValue::Set(next_occurrence.due_date);
+                    active_model.due_datetime = ActiveValue::Set(next_occurrence.due_datetime);
+                    active_model.is_recurring = ActiveValue::Set(next_occurrence.is_recurring);
+                    active_model.is_completed = ActiveValue::Set(false);
+                    active_model.completed_at = ActiveValue::Set(None);
+                    TaskRepository::update(&storage.conn, active_model).await?;
+                }
+                return Ok(());
+            }
+        }
+
+        // Non-recurring tasks move to completion history.
         let (completed_since, completed_until) = datetime::today_completion_range();
         let completed_at = backend
             .fetch_completed_tasks(&completed_since, &completed_until)
@@ -783,5 +809,51 @@ impl SyncService {
         }
 
         Ok(())
+    }
+}
+
+fn validate_recurring_occurrence(remote_id: &str, task: &crate::backend::BackendTask) -> Result<()> {
+    if task.remote_id != remote_id || task.is_completed {
+        anyhow::bail!("Recurring task advanced remotely, but Todoist returned an invalid next occurrence");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_recurring_occurrence;
+    use crate::backend::BackendTask;
+
+    fn recurring_task(remote_id: &str, is_completed: bool) -> BackendTask {
+        BackendTask {
+            remote_id: remote_id.to_string(),
+            content: "Pay rent".to_string(),
+            description: None,
+            project_remote_id: "inbox".to_string(),
+            section_remote_id: None,
+            parent_remote_id: None,
+            priority: 1,
+            order_index: 0,
+            due_date: Some("2026-09-01".to_string()),
+            due_datetime: None,
+            is_recurring: true,
+            deadline: None,
+            duration: None,
+            is_completed,
+            completed_at: None,
+            labels: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn accepts_active_next_occurrence_with_same_remote_id() {
+        let task = recurring_task("task-1", false);
+        assert!(validate_recurring_occurrence("task-1", &task).is_ok());
+    }
+
+    #[test]
+    fn rejects_completed_or_mismatched_next_occurrence() {
+        assert!(validate_recurring_occurrence("task-1", &recurring_task("task-1", true)).is_err());
+        assert!(validate_recurring_occurrence("task-1", &recurring_task("task-2", false)).is_err());
     }
 }
