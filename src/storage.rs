@@ -10,6 +10,26 @@ pub struct LocalStorage {
     pub conn: DatabaseConnection,
 }
 
+#[cfg(test)]
+pub(crate) async fn remove_test_database(db_path: PathBuf) -> std::io::Result<()> {
+    const MAX_ATTEMPTS: usize = 20;
+    let mut delay = Duration::from_millis(10);
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match std::fs::remove_file(&db_path) {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) if attempt == MAX_ATTEMPTS => return Err(error),
+            Err(_) => {
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(Duration::from_millis(100));
+            }
+        }
+    }
+
+    unreachable!("the bounded database removal loop always returns")
+}
+
 impl LocalStorage {
     /// Get the database file path using XDG directories
     fn get_db_path() -> Result<PathBuf> {

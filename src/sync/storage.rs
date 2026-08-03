@@ -609,7 +609,7 @@ mod tests {
             ),
         };
         storage.conn.close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        crate::storage::remove_test_database(db_path).await.unwrap();
     }
 
     #[tokio::test]

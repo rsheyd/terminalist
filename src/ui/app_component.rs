@@ -1766,7 +1766,7 @@ impl AppComponent {
 mod tests {
     use super::*;
     use crate::entities::{backend, project};
-    use crate::storage::LocalStorage;
+    use crate::storage::{remove_test_database, LocalStorage};
     use sea_orm::{EntityTrait, Set};
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -1790,7 +1790,7 @@ mod tests {
             ),
         };
         storage.conn.close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        remove_test_database(db_path).await.unwrap();
     }
 
     fn snapshot(generation: u64, selection: SidebarSelection, projects: Vec<project::Model>) -> ViewSnapshot {
