@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.2-dev.1] - 2026-08-03
+- Scheduling field for new tasks
+
+## [0.7.1-dev.1]
+- Editing task descriptions
+
+## [0.7.0-dev.1]
 
 ### Added
 - **AI Task Management** - Generate review-first OpenAI proposals from task details, let the model inspect cached projects and tasks through read-only tools, revise recommendations and proposed actions, and apply only explicitly confirmed Todoist changes

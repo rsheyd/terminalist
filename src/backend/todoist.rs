@@ -183,6 +183,7 @@ impl TodoistBackend {
             section_id: args.section_remote_id,
             parent_id: args.parent_remote_id,
             priority: args.priority,
+            due_string: args.due_string,
             due_date: args.due_date,
             due_datetime: args.due_datetime,
             labels: Some(args.labels),
@@ -658,6 +659,7 @@ mod tests {
             section_remote_id: None,
             parent_remote_id: None,
             priority: None,
+            due_string: None,
             due_date: None,
             due_datetime: None,
             duration: None,
@@ -667,6 +669,28 @@ mod tests {
         let todoist_args = TodoistBackend::task_create_args_to_todoist(args);
 
         assert_eq!(todoist_args.project_id, None);
+    }
+
+    #[test]
+    fn creating_a_recurring_task_passes_the_natural_language_schedule() {
+        let args = CreateTaskArgs {
+            content: "Water plants".to_string(),
+            description: None,
+            project_remote_id: None,
+            section_remote_id: None,
+            parent_remote_id: None,
+            priority: None,
+            due_string: Some("every Saturday".to_string()),
+            due_date: None,
+            due_datetime: None,
+            duration: None,
+            labels: Vec::new(),
+        };
+
+        let todoist_args = TodoistBackend::task_create_args_to_todoist(args);
+
+        assert_eq!(todoist_args.due_string.as_deref(), Some("every Saturday"));
+        assert_eq!(todoist_args.due_date, None);
     }
 
     #[test]

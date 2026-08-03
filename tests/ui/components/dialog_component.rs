@@ -52,6 +52,58 @@ fn test_dialog_component_creation() {
 }
 
 #[test]
+fn task_creation_collects_a_separate_recurring_schedule() {
+    let mut dialog = DialogComponent::new();
+    dialog.update(Action::ShowDialog(DialogType::TaskCreation {
+        default_project_uuid: None,
+        default_due_date: Some("2026-08-03".to_string()),
+        default_label_uuid: None,
+    }));
+
+    for character in "Water plants".chars() {
+        dialog.handle_key_events(key(KeyCode::Char(character)));
+    }
+    dialog.handle_key_events(key(KeyCode::Down));
+    for character in "every Saturday".chars() {
+        dialog.handle_key_events(key(KeyCode::Char(character)));
+    }
+
+    let action = dialog.handle_key_events(key(KeyCode::Enter));
+
+    assert!(matches!(
+        action,
+        Action::CreateTask {
+            content,
+            due_string: Some(due_string),
+            due_date: None,
+            ..
+        } if content == "Water plants" && due_string == "every Saturday"
+    ));
+}
+
+#[test]
+fn task_creation_keeps_the_default_date_when_schedule_is_empty() {
+    let mut dialog = DialogComponent::new();
+    dialog.update(Action::ShowDialog(DialogType::TaskCreation {
+        default_project_uuid: None,
+        default_due_date: Some("2026-08-03".to_string()),
+        default_label_uuid: None,
+    }));
+    dialog.handle_key_events(key(KeyCode::Char('x')));
+
+    let action = dialog.handle_key_events(key(KeyCode::Enter));
+
+    assert!(matches!(
+        action,
+        Action::CreateTask {
+            due_string: None,
+            due_date: Some(due_date),
+            ..
+        } if due_date == "2026-08-03"
+    ));
+}
+
+#[test]
 fn test_search_result_navigation_is_bounded() {
     let mut dialog = DialogComponent::new();
     dialog.dialog_type = Some(DialogType::TaskSearch);

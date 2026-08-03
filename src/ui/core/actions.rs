@@ -296,6 +296,7 @@ pub enum Action {
     CreateTask {
         content: String,
         project_uuid: Option<Uuid>,
+        due_string: Option<String>,
         due_date: Option<String>,
         label_uuid: Option<Uuid>,
     },
@@ -484,6 +485,7 @@ mod tests {
         assert!(Action::CreateTask {
             content: "New task".to_string(),
             project_uuid: None,
+            due_string: None,
             due_date: None,
             label_uuid: None,
         }

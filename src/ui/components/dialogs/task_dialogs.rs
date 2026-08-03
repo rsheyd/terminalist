@@ -545,28 +545,41 @@ pub fn render_task_dialog(
     area: Rect,
     _icons: &IconService,
     input_buffer: &str,
+    schedule_buffer: &str,
+    schedule_focused: bool,
     cursor_position: usize,
     task_projects: &[&project::Model],
     selected_project_index: Option<usize>,
     is_editing: bool,
 ) {
     let title = if is_editing { "Edit Task" } else { "New Task" };
-    let dialog_area = LayoutManager::centered_rect_lines(65, 12, area);
+    let dialog_area = LayoutManager::centered_rect_lines(65, if is_editing { 12 } else { 16 }, area);
     f.render_widget(Clear, dialog_area);
 
     let main_block = common::create_dialog_block(title, Color::Cyan);
 
     // Create layout for content
     let inner_area = main_block.inner(dialog_area);
+    let constraints = if is_editing {
+        vec![
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ]
+    } else {
+        vec![
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ]
+    };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([
-            Constraint::Length(4), // Task content input field (borders + content)
-            Constraint::Length(4), // Project selection field (borders + content)
-            Constraint::Length(1), // Spacer
-            Constraint::Length(1), // Instructions
-        ])
+        .constraints(constraints)
         .split(inner_area);
 
     let input_width = chunks[0].width.saturating_sub(2);
@@ -585,6 +598,13 @@ pub fn render_task_dialog(
     };
 
     let project_paragraph = common::create_selection_paragraph(project_name, "Project");
+    let schedule_width = chunks[1].width.saturating_sub(2);
+    let schedule_paragraph = common::create_input_paragraph(
+        schedule_buffer,
+        cursor_position,
+        schedule_width,
+        "Schedule (for example: every weekday at 9am)",
+    );
 
     // Instructions based on mode
     let action = if is_editing {
@@ -593,25 +613,48 @@ pub fn render_task_dialog(
         ("Enter", Color::Green, " Create Task")
     };
 
-    let instructions = [
-        action,
-        shortcuts::SEPARATOR,
-        shortcuts::TAB_SELECT,
-        (" Project", Color::Gray, ""),
-        shortcuts::SEPARATOR,
-        shortcuts::ESC_CANCEL,
-    ];
+    let instructions = if is_editing {
+        vec![
+            action,
+            shortcuts::SEPARATOR,
+            shortcuts::TAB_SELECT,
+            (" Project", Color::Gray, ""),
+            shortcuts::SEPARATOR,
+            shortcuts::ESC_CANCEL,
+        ]
+    } else {
+        vec![
+            action,
+            shortcuts::SEPARATOR,
+            ("↑/↓", Color::Cyan, " Field"),
+            shortcuts::SEPARATOR,
+            shortcuts::TAB_SELECT,
+            (" Project", Color::Gray, ""),
+            shortcuts::SEPARATOR,
+            shortcuts::ESC_CANCEL,
+        ]
+    };
     let instructions_paragraph = common::create_instructions_paragraph(&instructions);
 
     // Render all components
     f.render_widget(main_block, dialog_area);
     f.render_widget(input_paragraph, chunks[0]);
-    f.render_widget(project_paragraph, chunks[1]);
-    f.render_widget(instructions_paragraph, chunks[3]);
+    let project_index = if is_editing { 1 } else { 2 };
+    let instructions_index = if is_editing { 3 } else { 4 };
+    if !is_editing {
+        f.render_widget(schedule_paragraph, chunks[1]);
+    }
+    f.render_widget(project_paragraph, chunks[project_index]);
+    f.render_widget(instructions_paragraph, chunks[instructions_index]);
 
     // Set the cursor inside the horizontally scrolled input viewport.
-    let (_, visible_cursor_column) = common::input_viewport(input_buffer, cursor_position, input_width);
-    f.set_cursor_position((chunks[0].x + 1 + visible_cursor_column, chunks[0].y + 1));
+    let (focused_buffer, focused_chunk, focused_width) = if !is_editing && schedule_focused {
+        (schedule_buffer, chunks[1], schedule_width)
+    } else {
+        (input_buffer, chunks[0], input_width)
+    };
+    let (_, visible_cursor_column) = common::input_viewport(focused_buffer, cursor_position, focused_width);
+    f.set_cursor_position((focused_chunk.x + 1 + visible_cursor_column, focused_chunk.y + 1));
 }
 
 // Legacy wrapper functions for backward compatibility
@@ -620,6 +663,8 @@ pub fn render_task_creation_dialog(
     area: Rect,
     icons: &IconService,
     input_buffer: &str,
+    schedule_buffer: &str,
+    schedule_focused: bool,
     cursor_position: usize,
     task_projects: &[&project::Model],
     selected_task_project_index: Option<usize>,
@@ -629,6 +674,8 @@ pub fn render_task_creation_dialog(
         area,
         icons,
         input_buffer,
+        schedule_buffer,
+        schedule_focused,
         cursor_position,
         task_projects,
         selected_task_project_index,
@@ -650,6 +697,8 @@ pub fn render_task_edit_dialog(
         area,
         icons,
         input_buffer,
+        "",
+        false,
         cursor_position,
         task_projects,
         selected_task_project_index,

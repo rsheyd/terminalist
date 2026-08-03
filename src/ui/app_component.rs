@@ -796,6 +796,7 @@ impl AppComponent {
             Action::CreateTask {
                 content,
                 project_uuid,
+                due_string,
                 due_date,
                 label_uuid,
             } => {
@@ -808,6 +809,7 @@ impl AppComponent {
                 self.spawn_operation(Operation::Task(TaskOperation::Create {
                     content,
                     project_uuid,
+                    due_string,
                     due_date,
                     label_uuid,
                 }));

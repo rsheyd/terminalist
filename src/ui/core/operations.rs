@@ -20,6 +20,7 @@ pub enum TaskOperation {
     Create {
         content: String,
         project_uuid: Option<Uuid>,
+        due_string: Option<String>,
         due_date: Option<String>,
         label_uuid: Option<Uuid>,
     },
@@ -125,11 +126,20 @@ impl Operation {
             Self::Task(TaskOperation::Create {
                 content,
                 project_uuid,
+                due_string,
                 due_date,
                 label_uuid,
             }) => sync_service
-                .create_task(&content, project_uuid, due_date.as_deref(), label_uuid)
+                .create_task_rich(crate::sync::tasks::RichCreateTaskArgs {
+                    content,
+                    project_uuid,
+                    due_string,
+                    due_date,
+                    label_uuid,
+                    ..Default::default()
+                })
                 .await
+                .map(|_| ())
                 .context(description.clone())?,
             Self::Task(TaskOperation::Edit { task_uuid, content }) => sync_service
                 .update_task_content(&task_uuid, &content)
@@ -178,6 +188,7 @@ mod tests {
         let operation = Operation::Task(TaskOperation::Create {
             content: "Review A|B: preserve this exactly".to_string(),
             project_uuid: Some(Uuid::new_v4()),
+            due_string: None,
             due_date: None,
             label_uuid: None,
         });

@@ -46,6 +46,8 @@ use crate::ui::components::dialogs::{
 pub struct DialogComponent {
     pub dialog_type: Option<DialogType>,
     pub input_buffer: String,
+    pub task_schedule_buffer: String,
+    pub task_schedule_focused: bool,
     pub cursor_position: usize,
     pub projects: Vec<project::Model>,
     pub labels: Vec<label::Model>,
@@ -85,6 +87,8 @@ impl DialogComponent {
         Self {
             dialog_type: None,
             input_buffer: String::new(),
+            task_schedule_buffer: String::new(),
+            task_schedule_focused: false,
             cursor_position: 0,
             projects: Vec::new(),
             labels: Vec::new(),
@@ -201,7 +205,14 @@ impl DialogComponent {
                     let action = Action::CreateTask {
                         content: self.input_buffer.clone(),
                         project_uuid,
-                        due_date: default_due_date.clone(),
+                        due_string: (!self.task_schedule_buffer.trim().is_empty())
+                            .then(|| self.task_schedule_buffer.trim().to_string()),
+                        due_date: self
+                            .task_schedule_buffer
+                            .trim()
+                            .is_empty()
+                            .then(|| default_due_date.clone())
+                            .flatten(),
                         label_uuid: *default_label_uuid,
                     };
                     self.clear_dialog();
@@ -361,6 +372,8 @@ impl DialogComponent {
     fn clear_dialog(&mut self) {
         self.dialog_type = None;
         self.input_buffer.clear();
+        self.task_schedule_buffer.clear();
+        self.task_schedule_focused = false;
         self.cursor_position = 0;
         self.selected_project_index = 0;
         self.selected_parent_project_index = None;
@@ -405,6 +418,8 @@ impl DialogComponent {
             area,
             &self.icons,
             &self.input_buffer,
+            &self.task_schedule_buffer,
+            self.task_schedule_focused,
             self.cursor_position,
             &task_projects,
             self.selected_task_project_index,
@@ -928,6 +943,103 @@ impl Component for DialogComponent {
             return self.handle_ai_task_management_key(key);
         }
 
+        if matches!(self.dialog_type, Some(DialogType::TaskCreation { .. })) {
+            match key.code {
+                KeyCode::Esc => return Action::HideDialog,
+                KeyCode::Enter => return self.handle_submit(),
+                KeyCode::Up | KeyCode::Down => {
+                    self.task_schedule_focused = !self.task_schedule_focused;
+                    self.cursor_position = if self.task_schedule_focused {
+                        self.task_schedule_buffer.chars().count()
+                    } else {
+                        self.input_buffer.chars().count()
+                    };
+                    return Action::None;
+                }
+                KeyCode::Tab => {
+                    let projects_data: Vec<(Uuid, String)> = self
+                        .get_task_projects()
+                        .iter()
+                        .map(|project| (project.uuid, project.name.clone()))
+                        .collect();
+                    if !projects_data.is_empty() {
+                        self.task_project_explicitly_selected = true;
+                        self.selected_task_project_index = match self.selected_task_project_index {
+                            None => {
+                                self.selected_task_project_uuid = Some(projects_data[0].0);
+                                Some(0)
+                            }
+                            Some(index) => {
+                                let next_index = (index + 1) % (projects_data.len() + 1);
+                                if next_index == projects_data.len() {
+                                    self.selected_task_project_uuid = None;
+                                    None
+                                } else {
+                                    self.selected_task_project_uuid = Some(projects_data[next_index].0);
+                                    Some(next_index)
+                                }
+                            }
+                        };
+                    }
+                    return Action::None;
+                }
+                KeyCode::Char(character) => {
+                    let buffer = if self.task_schedule_focused {
+                        &mut self.task_schedule_buffer
+                    } else {
+                        &mut self.input_buffer
+                    };
+                    let byte_position = buffer.chars().take(self.cursor_position).map(char::len_utf8).sum();
+                    buffer.insert(byte_position, character);
+                    self.cursor_position += 1;
+                    return Action::None;
+                }
+                KeyCode::Backspace => {
+                    let buffer = if self.task_schedule_focused {
+                        &mut self.task_schedule_buffer
+                    } else {
+                        &mut self.input_buffer
+                    };
+                    if self.cursor_position > 0 {
+                        let byte_position: usize = buffer.chars().take(self.cursor_position).map(char::len_utf8).sum();
+                        let previous_width =
+                            buffer.chars().nth(self.cursor_position - 1).map(char::len_utf8).unwrap_or(1);
+                        buffer.remove(byte_position - previous_width);
+                        self.cursor_position -= 1;
+                    }
+                    return Action::None;
+                }
+                KeyCode::Delete => {
+                    let buffer = if self.task_schedule_focused {
+                        &mut self.task_schedule_buffer
+                    } else {
+                        &mut self.input_buffer
+                    };
+                    if self.cursor_position < buffer.chars().count() {
+                        let byte_position = buffer.chars().take(self.cursor_position).map(char::len_utf8).sum();
+                        buffer.remove(byte_position);
+                    }
+                    return Action::None;
+                }
+                KeyCode::Left => {
+                    self.cursor_position = self.cursor_position.saturating_sub(1);
+                    return Action::None;
+                }
+                KeyCode::Right => {
+                    let character_count = if self.task_schedule_focused {
+                        self.task_schedule_buffer.chars().count()
+                    } else {
+                        self.input_buffer.chars().count()
+                    };
+                    if self.cursor_position < character_count {
+                        self.cursor_position += 1;
+                    }
+                    return Action::None;
+                }
+                _ => {}
+            }
+        }
+
         match &self.dialog_type {
             Some(DialogType::TaskDetails { task }) => match key.code {
                 KeyCode::Esc | KeyCode::Enter => Action::HideDialog,
@@ -1385,6 +1497,8 @@ impl Component for DialogComponent {
                         default_project_uuid, ..
                     } => {
                         self.input_buffer.clear();
+                        self.task_schedule_buffer.clear();
+                        self.task_schedule_focused = false;
                         self.cursor_position = 0;
                         // Set the selected task project index and UUID if a default project is provided
                         if let Some(project_uuid) = default_project_uuid {

@@ -113,6 +113,7 @@ pub struct CreateTaskArgs {
     pub section_remote_id: Option<String>,
     pub parent_remote_id: Option<String>,
     pub priority: Option<i32>,
+    pub due_string: Option<String>,
     pub due_date: Option<String>,
     pub due_datetime: Option<String>,
     pub duration: Option<String>,

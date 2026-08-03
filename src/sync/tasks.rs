@@ -12,6 +12,7 @@ pub struct RichCreateTaskArgs {
     pub description: Option<String>,
     pub project_uuid: Option<Uuid>,
     pub priority: Option<i32>,
+    pub due_string: Option<String>,
     pub due_date: Option<String>,
     pub label_uuid: Option<Uuid>,
 }
@@ -211,6 +212,7 @@ impl SyncService {
             section_remote_id: None,
             parent_remote_id: None,
             priority: args.priority,
+            due_string: args.due_string,
             due_date: args.due_date,
             due_datetime: None,
             duration: None,
@@ -701,6 +703,7 @@ impl SyncService {
                 section_remote_id: remote_section_id,
                 parent_remote_id: remote_parent_id,
                 priority: Some(task.priority),
+                due_string: None,
                 due_date: task.due_date.clone(),
                 due_datetime: task.due_datetime.clone(),
                 duration: task.duration.clone(),
