@@ -1456,6 +1456,9 @@ impl AppComponent {
     }
 }
 
+#[cfg(test)]
+mod screenshot_tests;
+
 impl AppComponent {
     fn persist_ui_state(&self) {
         let Some(path) = &self.ui_state_path else {

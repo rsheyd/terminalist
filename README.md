@@ -11,7 +11,7 @@
 
 A terminal application for interacting with Todoist, built in Rust with a modern TUI interface.
 
-<img src="docs/images/screenshot1.png" width="48%" alt="Terminalist Main Interface"> <img src="docs/images/screenshot2.png" width="48%" alt="Terminalist Project View">
+<img src="docs/images/screenshot1.png" width="48%" alt="Terminalist main interface"> <img src="docs/images/screenshot2.png" width="48%" alt="Terminalist task details">
 
 ## Features
 

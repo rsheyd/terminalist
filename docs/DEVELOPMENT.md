@@ -44,13 +44,28 @@ cargo doc --open --no-deps  # Generate and open documentation
 4. `cargo check` - Quick compile check
 5. `git commit` - Commit your changes
 
+### README screenshots
+
+README screenshots are generated from the real Ratatui application renderer with deterministic,
+sanitized fixture data. ImageMagick must be installed and available as `magick`. The generator
+uses Monaco on macOS or DejaVu Sans Mono on Linux; set `TERMINALIST_SCREENSHOT_FONT` to override
+the font-file path.
+
+```bash
+TERMINALIST_SCREENSHOT_DIR=docs/images \
+  cargo test generate_readme_screenshots -- --ignored --nocapture
+```
+
+The generator is an ignored test, so normal test runs never rewrite documentation assets. Review
+both PNG files visually before committing them.
+
 ## CI/CD
 
 GitHub Actions workflow is configured in `.github/workflows/ci.yml` with:
 - Format checking with rustfmt
 - Linting with clippy
 - Testing on multiple Rust versions and OSes
-- MSRV 1.78 build job
+- MSRV 1.92 build job
 - Smoke tests for `--help` and `--version`
 - Security auditing
 
