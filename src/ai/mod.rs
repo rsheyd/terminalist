@@ -679,7 +679,7 @@ mod tests {
             move_original_to: None,
             complete_original: true,
         }
-        .into_proposal(&[existing.clone()])
+        .into_proposal(std::slice::from_ref(&existing))
         .unwrap();
 
         assert!(matches!(

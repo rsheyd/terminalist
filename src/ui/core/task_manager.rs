@@ -379,6 +379,14 @@ impl TaskManager {
         }
     }
 
+    #[cfg(test)]
+    pub async fn cancel_all_tasks_and_wait(&mut self) {
+        for (_, task) in self.tasks.drain() {
+            task.handle.abort();
+            let _ = task.handle.await;
+        }
+    }
+
     /// Get the number of active tasks
     pub fn task_count(&self) -> usize {
         self.tasks.len()

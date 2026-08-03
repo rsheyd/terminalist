@@ -1778,6 +1778,21 @@ mod tests {
         (AppComponent::new(sync_service, Config::default()), storage, db_path)
     }
 
+    async fn cleanup_test_app(mut app: AppComponent, storage: Arc<Mutex<LocalStorage>>, db_path: std::path::PathBuf) {
+        app.task_manager.cancel_all_tasks_and_wait().await;
+        drop(app);
+
+        let storage = match Arc::try_unwrap(storage) {
+            Ok(storage) => storage.into_inner(),
+            Err(storage) => panic!(
+                "test storage still has {} owners during cleanup",
+                Arc::strong_count(&storage)
+            ),
+        };
+        storage.conn.close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
     fn snapshot(generation: u64, selection: SidebarSelection, projects: Vec<project::Model>) -> ViewSnapshot {
         ViewSnapshot {
             generation,
@@ -1892,9 +1907,7 @@ mod tests {
             assert!(top_bar.contains(view), "missing {view} in top bar: {top_bar:?}");
         }
 
-        app.task_manager.cancel_all_tasks();
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -1914,8 +1927,7 @@ mod tests {
         .unwrap();
 
         assert!(!app.sidebar_collapsed);
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[test]
@@ -1959,8 +1971,7 @@ mod tests {
 
         assert_eq!(app.latest_applied_generation, 2);
         assert_eq!(app.state.projects[0].name, "Latest");
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -1981,8 +1992,7 @@ mod tests {
         assert!(matches!(follow_up, Action::ShowDialog(DialogType::Error(_))));
         assert_eq!(app.state.projects[0].name, "Still visible");
         assert_eq!(app.state.error_message.as_deref(), Some("offline"));
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -2000,8 +2010,7 @@ mod tests {
 
         assert_eq!(app.state.sidebar_selection, SidebarSelection::Trash);
         assert!(app.state.tasks.is_empty());
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -2059,9 +2068,7 @@ mod tests {
         assert_eq!(app.state.projects[0].name, "Cached project");
         assert!(app.state.error_message.is_some());
 
-        app.task_manager.cancel_all_tasks();
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -2073,8 +2080,6 @@ mod tests {
         app.handle_app_action(Action::RefreshData).await;
 
         assert_eq!(app.task_manager.task_count(), 2);
-        app.task_manager.cancel_all_tasks();
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_app(app, storage, db_path).await;
     }
 }

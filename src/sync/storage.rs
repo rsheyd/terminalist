@@ -595,6 +595,23 @@ mod tests {
         }
     }
 
+    async fn cleanup_test_storage(
+        service: SyncService,
+        storage: Arc<Mutex<LocalStorage>>,
+        db_path: std::path::PathBuf,
+    ) {
+        drop(service);
+        let storage = match Arc::try_unwrap(storage) {
+            Ok(storage) => storage.into_inner(),
+            Err(storage) => panic!(
+                "test storage still has {} owners during cleanup",
+                Arc::strong_count(&storage)
+            ),
+        };
+        storage.conn.close().await.unwrap();
+        std::fs::remove_file(db_path).unwrap();
+    }
+
     #[tokio::test]
     async fn failed_snapshot_write_preserves_the_previous_cache() {
         let db_path = std::env::temp_dir().join(format!("terminalist-snapshot-{}.db", Uuid::new_v4()));
@@ -662,8 +679,7 @@ mod tests {
             assert_eq!(projects[0].remote_id, "cached-project");
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -719,8 +735,7 @@ mod tests {
             assert_eq!(tasks[0].remote_id, "retained");
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -769,8 +784,7 @@ mod tests {
             assert!(TaskRepository::get_all(&storage.conn).await.unwrap().is_empty());
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -835,8 +849,7 @@ mod tests {
             assert_eq!(deleted[0].remote_id, "recent");
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -902,8 +915,7 @@ mod tests {
             assert!(next_day.is_empty());
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -1000,8 +1012,7 @@ mod tests {
             assert_eq!(settings["theme"], "dark");
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 
     #[tokio::test]
@@ -1051,7 +1062,6 @@ mod tests {
             assert!(SectionRepository::get_all(&storage.conn).await.unwrap().is_empty());
         }
 
-        storage.lock().await.conn.clone().close().await.unwrap();
-        std::fs::remove_file(db_path).unwrap();
+        cleanup_test_storage(service, storage, db_path).await;
     }
 }

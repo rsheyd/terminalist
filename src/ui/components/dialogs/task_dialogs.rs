@@ -658,6 +658,7 @@ pub fn render_task_dialog(
 }
 
 // Legacy wrapper functions for backward compatibility
+#[allow(clippy::too_many_arguments)]
 pub fn render_task_creation_dialog(
     f: &mut Frame,
     area: Rect,

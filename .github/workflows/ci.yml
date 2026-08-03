@@ -20,6 +20,7 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
+        toolchain: stable
         components: rustfmt, clippy
 
     - name: Rust cache
@@ -67,14 +68,14 @@ jobs:
 
   # MSRV build job
   msrv:
-    name: MSRV 1.78 Build
+    name: MSRV 1.92 Build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
     - name: Install Rust (MSRV)
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: 1.78
+        toolchain: 1.92
         components: rustfmt, clippy
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
@@ -89,6 +90,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
     - uses: rustsec/audit-check@v2
       with:
         token: ${{ secrets.GITHUB_TOKEN }}

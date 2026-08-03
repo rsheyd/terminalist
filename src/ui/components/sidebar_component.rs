@@ -217,12 +217,10 @@ impl SidebarComponent {
                         return Some(account_id.clone());
                     }
                     SidebarItemType::Project {
-                        project, has_children, ..
-                    } => {
-                        if *has_children {
-                            return Some(project.uuid.to_string());
-                        }
-                    }
+                        project,
+                        has_children: true,
+                        ..
+                    } => return Some(project.uuid.to_string()),
                     _ => {}
                 }
             }
