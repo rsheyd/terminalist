@@ -1,13 +1,13 @@
 # Terminalist - Todoist Terminal Client
 
-[![Rust](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Build Status](https://github.com/romaintb/terminalist/workflows/CI/badge.svg)](https://github.com/romaintb/terminalist/actions)
 [![Crates.io](https://img.shields.io/crates/v/terminalist.svg)](https://crates.io/crates/terminalist)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Terminal](https://img.shields.io/badge/terminal-TUI-brightgreen.svg)](https://github.com/romaintb/terminalist)
 [![Todoist](https://img.shields.io/badge/Todoist-API-red.svg)](https://developer.todoist.com)
 
-**📖 Documentation:** [Configuration](docs/CONFIGURATION.md) | [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) | [Development](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md)
+**📖 Documentation:** [Configuration](docs/CONFIGURATION.md) | [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) | [Development](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Releasing](docs/RELEASING.md)
 
 A terminal application for interacting with Todoist, built in Rust with a modern TUI interface.
 
@@ -17,11 +17,13 @@ A terminal application for interacting with Todoist, built in Rust with a modern
 
 - **Interactive TUI Interface** - Beautiful terminal user interface with ratatui
 - **Local Data Caching** - Fast, responsive UI with in-memory SQLite storage
-- **Smart Sync** - Automatic sync on startup and manual refresh with 'r'
+- **Smart Sync** - Incremental synchronization on startup and manual refresh with `r`
 - **Project Management** - Browse projects with hierarchical display
-- **Task Management** - View, navigate, complete, and create tasks
+- **Task Management** - View, navigate, create, edit, schedule, and complete tasks
+- **Agenda & Smart Views** - Move between Today, Agenda, Tomorrow, Upcoming, and Trash
 - **Recoverable Deletion** - Restore recently deleted tasks from a 30-day local Trash
 - **Task Search** - Fast database-powered search across all tasks with '/' shortcut
+- **Review-first AI Assistance** - Generate and revise task-management proposals before explicitly applying Todoist changes
 - **Keyboard & Mouse Navigation** - Efficient keyboard operation with mouse support
 - **Real-time Updates** - Create, complete, and delete tasks/projects
 - **Label Support** - View task labels with colored badges

@@ -11,6 +11,7 @@ This directory contains all documentation for Terminalist.
 
 - **[Development Guide](DEVELOPMENT.md)** - Setup instructions and development workflow
 - **[Architecture Overview](ARCHITECTURE.md)** - Technical architecture and project structure
+- **[Release Process](RELEASING.md)** - Versioning, validation, tagging, and GitHub release procedure
 - **[Current UI Work Baseline](CURRENT_UI_WORK_BASELINE.md)** - Scope, commit strategy, validation, and review guidance for the current UI changes
 - **[Post-PR #188 Changes](POST_PR188_CHANGES.md)** - Feature ledger, validation record, and future PR notes for `codex/post-pr188`
 - **[Architecture Refactor Plan](ARCHITECTURE_REFACTOR_PLAN.md)** - Implementation status and remaining correctness, performance, and transport improvements

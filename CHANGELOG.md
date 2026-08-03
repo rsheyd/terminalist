@@ -5,22 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.2-dev.1] - 2026-08-03
-- Scheduling field for new tasks
-
-## [0.7.1-dev.1]
-- Editing task descriptions
-
-## [0.7.0-dev.1]
+## [0.7.2] - 2026-08-03
 
 ### Added
 - **AI Task Management** - Generate review-first OpenAI proposals from task details, let the model inspect cached projects and tasks through read-only tools, revise recommendations and proposed actions, and apply only explicitly confirmed Todoist changes
+- **Agenda and Scheduling** - Browse tasks in an Agenda view and set a scheduling field when creating tasks
 - **Incremental Todoist Sync** - Persist Todoist Sync API tokens and retrieve only remote changes after the initial full synchronization
 - **Smart View Bar** - Show Today, Agenda, Tomorrow, Upcoming, and Trash in an always-visible top navigation bar with keyboard and mouse navigation
 - **Persistent Sidebar Rail** - Collapse Projects & Labels to a clickable three-column rail and restore its last state and expanded width on startup
 - **Sidebar Hints** - Show `[ ] move · b hide` on the expanded Projects & Labels pane instead of duplicating sidebar navigation in the global shortcut bar
 - **Quieter Pane Chrome** - Mute the collapsed sidebar hint and task-list border so task content remains the visual focus
 - **Contextual Task Titles** - Identify the active smart view, project, or label in the task-pane title
+- **Task Editing** - Edit task titles and descriptions from the task details dialog
 
 ### Changed
 - **Named Priorities** - Present priorities as low, medium, high, and urgent while retaining Todoist's numeric representation only at the integration boundary
@@ -32,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **AI Proposal Layout** - Keep wrapped recommendations, action lists, scroll indicators, cursors, and responsive command footers visible within the dialog
 - **Empty Trash Navigation** - Keep the permanently available Trash smart view selected when it contains no tasks
+- **Recurring Task Reconciliation** - Reconcile recurring task completion correctly during synchronization
 
 ## [0.5.0] - 2026-03-25
 
