@@ -853,7 +853,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remotely_completed_task_is_cached_and_selected_only_for_its_completion_day() {
+    async fn remotely_completed_task_is_cached_only_for_today_view_on_its_completion_day() {
         let db_path = std::env::temp_dir().join(format!("terminalist-snapshot-{}.db", Uuid::new_v4()));
         let storage = LocalStorage::new_at(db_path.clone()).await.unwrap();
         let backend_uuid = Uuid::new_v4();
@@ -913,6 +913,14 @@ mod tests {
             .await
             .unwrap();
             assert!(next_day.is_empty());
+
+            let upcoming = TaskRepository::get_for_upcoming(&storage.conn, "2026-07-18", "2026-10-16")
+                .await
+                .unwrap();
+            assert!(upcoming.is_empty());
+
+            let tomorrow = TaskRepository::get_for_tomorrow(&storage.conn, "2026-07-18").await.unwrap();
+            assert!(tomorrow.is_empty());
         }
 
         cleanup_test_storage(service, storage, db_path).await;

@@ -125,13 +125,14 @@ pub fn create_input_paragraph<'a>(
 }
 
 /// Creates a selection field block (read-only display with title)
-pub fn create_selection_paragraph(value: String, field_title: &str) -> Paragraph<'static> {
+pub fn create_selection_paragraph(value: String, field_title: &str, focused: bool) -> Paragraph<'static> {
+    let border_color = if focused { Color::Cyan } else { Color::Gray };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title(format!(" {} ", field_title))
         .title_style(Style::default().fg(Color::White))
-        .style(Style::default().fg(Color::Gray));
+        .style(Style::default().fg(border_color));
 
     Paragraph::new(value).block(block).style(Style::default().fg(Color::White))
 }

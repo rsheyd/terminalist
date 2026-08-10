@@ -50,7 +50,7 @@ pub fn render_project_creation_dialog(
         }
     };
 
-    let parent_paragraph = common::create_selection_paragraph(parent_project_name, "Parent Project");
+    let parent_paragraph = common::create_selection_paragraph(parent_project_name, "Parent Project", false);
 
     let instructions = [
         ("Enter", Color::Green, " Create Project"),

@@ -180,6 +180,7 @@ impl TaskRepository {
         Ok(task::Entity::find()
             .filter(task::Column::DueDate.eq(tomorrow))
             .filter(task::Column::IsDeleted.eq(false))
+            .filter(task::Column::IsCompleted.eq(false))
             .order_by_asc(task::Column::IsDeleted)
             .order_by_asc(task::Column::IsCompleted)
             .order_by_asc(task::Column::OrderIndex)
@@ -194,14 +195,17 @@ impl TaskRepository {
     {
         let overdue_tasks = task::Entity::overdue(today)
             .filter(task::Column::IsDeleted.eq(false))
+            .filter(task::Column::IsCompleted.eq(false))
             .all(conn)
             .await?;
         let today_tasks = task::Entity::due_today(today)
             .filter(task::Column::IsDeleted.eq(false))
+            .filter(task::Column::IsCompleted.eq(false))
             .all(conn)
             .await?;
         let future_tasks = task::Entity::due_between(today, three_months_later)
             .filter(task::Column::IsDeleted.eq(false))
+            .filter(task::Column::IsCompleted.eq(false))
             .all(conn)
             .await?;
 

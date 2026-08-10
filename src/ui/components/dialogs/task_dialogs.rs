@@ -547,6 +547,7 @@ pub fn render_task_dialog(
     input_buffer: &str,
     schedule_buffer: &str,
     schedule_focused: bool,
+    task_creation_field: usize,
     cursor_position: usize,
     task_projects: &[&project::Model],
     selected_project_index: Option<usize>,
@@ -597,7 +598,7 @@ pub fn render_task_dialog(
         }
     };
 
-    let project_paragraph = common::create_selection_paragraph(project_name, "Project");
+    let project_paragraph = common::create_selection_paragraph(project_name, "Project", task_creation_field == 2);
     let schedule_width = chunks[1].width.saturating_sub(2);
     let schedule_paragraph = common::create_input_paragraph(
         schedule_buffer,
@@ -626,10 +627,9 @@ pub fn render_task_dialog(
         vec![
             action,
             shortcuts::SEPARATOR,
-            ("↑/↓", Color::Cyan, " Field"),
+            ("Tab", Color::Cyan, " Next Field"),
             shortcuts::SEPARATOR,
-            shortcuts::TAB_SELECT,
-            (" Project", Color::Gray, ""),
+            ("←/→", Color::Cyan, " Project"),
             shortcuts::SEPARATOR,
             shortcuts::ESC_CANCEL,
         ]
@@ -648,6 +648,9 @@ pub fn render_task_dialog(
     f.render_widget(instructions_paragraph, chunks[instructions_index]);
 
     // Set the cursor inside the horizontally scrolled input viewport.
+    if !is_editing && task_creation_field == 2 {
+        return;
+    }
     let (focused_buffer, focused_chunk, focused_width) = if !is_editing && schedule_focused {
         (schedule_buffer, chunks[1], schedule_width)
     } else {
@@ -666,6 +669,7 @@ pub fn render_task_creation_dialog(
     input_buffer: &str,
     schedule_buffer: &str,
     schedule_focused: bool,
+    task_creation_field: usize,
     cursor_position: usize,
     task_projects: &[&project::Model],
     selected_task_project_index: Option<usize>,
@@ -677,6 +681,7 @@ pub fn render_task_creation_dialog(
         input_buffer,
         schedule_buffer,
         schedule_focused,
+        task_creation_field,
         cursor_position,
         task_projects,
         selected_task_project_index,
@@ -700,6 +705,7 @@ pub fn render_task_edit_dialog(
         input_buffer,
         "",
         false,
+        0,
         cursor_position,
         task_projects,
         selected_task_project_index,

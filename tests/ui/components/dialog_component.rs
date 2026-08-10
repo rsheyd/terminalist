@@ -104,6 +104,58 @@ fn task_creation_keeps_the_default_date_when_schedule_is_empty() {
 }
 
 #[test]
+fn task_creation_tab_moves_between_fields() {
+    let mut dialog = DialogComponent::new();
+    dialog.projects = vec![follow_up_project()];
+    dialog.update(Action::ShowDialog(DialogType::TaskCreation {
+        default_project_uuid: None,
+        default_due_date: None,
+        default_label_uuid: None,
+    }));
+
+    dialog.handle_key_events(key(KeyCode::Char('a')));
+    dialog.handle_key_events(key(KeyCode::Tab));
+    dialog.handle_key_events(key(KeyCode::Char('b')));
+    dialog.handle_key_events(key(KeyCode::Tab));
+    dialog.handle_key_events(key(KeyCode::Char('c')));
+    dialog.handle_key_events(key(KeyCode::Tab));
+    dialog.handle_key_events(key(KeyCode::Char('d')));
+
+    assert_eq!(dialog.input_buffer, "ad");
+    assert_eq!(dialog.task_schedule_buffer, "b");
+    assert_eq!(dialog.task_creation_field, 0);
+}
+
+#[test]
+fn task_creation_arrows_cycle_projects_only_in_project_field() {
+    let mut dialog = DialogComponent::new();
+    let first = follow_up_project();
+    let mut second = follow_up_project();
+    second.name = "Second".to_string();
+    dialog.projects = vec![first.clone(), second.clone()];
+    dialog.update(Action::ShowDialog(DialogType::TaskCreation {
+        default_project_uuid: None,
+        default_due_date: None,
+        default_label_uuid: None,
+    }));
+
+    dialog.handle_key_events(key(KeyCode::Right));
+    assert_eq!(dialog.selected_task_project_uuid, None);
+
+    dialog.handle_key_events(key(KeyCode::Tab));
+    dialog.handle_key_events(key(KeyCode::Tab));
+    dialog.handle_key_events(key(KeyCode::Right));
+    assert_eq!(dialog.selected_task_project_uuid, Some(first.uuid));
+    dialog.handle_key_events(key(KeyCode::Right));
+    assert_eq!(dialog.selected_task_project_uuid, Some(second.uuid));
+    dialog.handle_key_events(key(KeyCode::Right));
+    assert_eq!(dialog.selected_task_project_uuid, None);
+    dialog.handle_key_events(key(KeyCode::Left));
+    assert_eq!(dialog.selected_task_project_uuid, Some(second.uuid));
+    assert!(dialog.task_project_explicitly_selected);
+}
+
+#[test]
 fn test_search_result_navigation_is_bounded() {
     let mut dialog = DialogComponent::new();
     dialog.dialog_type = Some(DialogType::TaskSearch);

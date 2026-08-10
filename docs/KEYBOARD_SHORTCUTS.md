@@ -30,7 +30,7 @@ selected view without moving keyboard focus away from the task list.
 - **`T`** Set marked tasks due tomorrow
 - **`w`** Set marked tasks due next week (Monday)
 - **`W`** Set marked tasks due next week end (Saturday)
-- **New Task dialog**: press **`↑`/`↓`** to switch between task content and an optional Todoist schedule such as `every weekday at 9am`; **`Tab`** continues to cycle projects
+- **New Task dialog**: press **`Tab`** to move between task content, an optional Todoist schedule such as `every weekday at 9am`, and the project field; with the project field selected, press **`←`/`→`** to switch projects
 
 When no tasks are marked, due-date and completion shortcuts operate on the
 currently highlighted task.
