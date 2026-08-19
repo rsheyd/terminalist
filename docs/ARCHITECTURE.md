@@ -10,7 +10,9 @@ src/
 ├── lib.rs                     # Library exports
 ├── config.rs                  # Configuration management
 ├── todoist.rs                 # Todoist API models & display structs
-├── sync.rs                    # Sync service with API integration
+├── ai/                        # OpenAI proposal generation and bounded context tools
+├── priority.rs                # Human-readable and Todoist priority conversion
+├── sync/                      # Sync orchestration, persistence, and mutations
 ├── storage.rs                 # Storage initialization
 ├── entities/                  # Sea-ORM domain entities
 │   ├── backend.rs             # Backend entity (Todoist, etc.)
@@ -58,14 +60,16 @@ src/
 
 ### Local Storage
 - Data is cached locally in a **file-backed SQLite database**
-- Database is recreated from scratch on each startup by syncing with the backend
+- The database is retained between runs; synchronization refreshes it without deleting the usable cache at startup
+- Backend configuration currently stores the Todoist API token as unencrypted JSON credentials in the database; see [Privacy and Local Data](../PRIVACY.md)
 - Uses Sea-ORM for type-safe database operations
 - Repository pattern provides clean data access layer
 - UUID-based primary keys for robust entity management
 
 ### Sync Behavior
 - **First Run**: Automatically syncs all data from Todoist
-- **Startup**: Loads local data instantly, then syncs in background if data is older than 5 minutes
+- **Startup**: Opens the retained cache and starts synchronization through the Todoist backend
+- **Incremental Sync**: Persists Todoist Sync API tokens transactionally and falls back to a full sync when a token is rejected
 - **Manual Sync**: Press `r` to force refresh from Todoist API
 - **Sync Indicators**: Sync progress is shown during operations
 
@@ -77,9 +81,18 @@ src/
 - **Labels**: Colored badges for task categorization
 - **Search**: Fast database-level search across all tasks with live results
 - **Real-time Updates**: Create, modify, and delete tasks/projects immediately
+- **Local Trash**: Retains remote-deletion tombstones for up to 30 days and can recreate a task from cached fields
 
 ### Backend Abstraction
 - **Backend Registry**: Centralized system for managing multiple backend services
 - **Repository Pattern**: Clean separation between data access and business logic
 - **Entity System**: Sea-ORM entities with UUID primary keys and backend associations
 - **Current Status**: Todoist is the only supported backend and remains the main focus. Preliminary architectural work has been completed to enable future support for other task management services.
+
+## AI Proposal Boundary
+
+- OpenAI proposal generation is invoked only from the task-details workflow.
+- The selected task and user context are sent initially; bounded read-only tools can expose cached projects or tasks when requested by the model.
+- Responses must match a restricted schema before they reach the review interface.
+- Todoist mutations occur only after action selection and a separate confirmation, then execute in a fixed order with completion last.
+- See [AI Task Management](AI_TASK_MANAGEMENT.md) for user-facing behavior and data flow.

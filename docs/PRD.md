@@ -1,5 +1,7 @@
 # Terminalist - Product Requirements Document (PRD)
 
+> Historical upstream-era planning document. It contains obsolete architecture, feature, shortcut, and dependency descriptions and is not a statement of current Terminalist Edge behavior. Use the root [README](../README.md), [keyboard shortcuts](KEYBOARD_SHORTCUTS.md), [architecture overview](ARCHITECTURE.md), and [changelog](../CHANGELOG.md) as current references.
+
 ## 1. Executive Summary
 
 ### 1.1 Product Overview

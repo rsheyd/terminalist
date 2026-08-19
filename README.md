@@ -1,151 +1,144 @@
-# Terminalist - Todoist Terminal Client
+# Terminalist Edge
 
-[![Rust](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Build Status](https://github.com/romaintb/terminalist/workflows/CI/badge.svg)](https://github.com/romaintb/terminalist/actions)
-[![Crates.io](https://img.shields.io/crates/v/terminalist.svg)](https://crates.io/crates/terminalist)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Terminal](https://img.shields.io/badge/terminal-TUI-brightgreen.svg)](https://github.com/romaintb/terminalist)
-[![Todoist](https://img.shields.io/badge/Todoist-API-red.svg)](https://developer.todoist.com)
+[![CI](https://github.com/rsheyd/terminalist-edge/actions/workflows/ci.yml/badge.svg)](https://github.com/rsheyd/terminalist-edge/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/rsheyd/terminalist-edge)](https://github.com/rsheyd/terminalist-edge/releases)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**📖 Documentation:** [Configuration](docs/CONFIGURATION.md) | [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) | [Development](docs/DEVELOPMENT.md) | [Architecture](docs/ARCHITECTURE.md) | [Releasing](docs/RELEASING.md)
+Terminalist Edge is an independently maintained downstream edition of [Terminalist](https://github.com/romaintb/terminalist), a keyboard-first Todoist client for the terminal. Edge develops expanded task-management workflows—including smart views, recoverable local Trash, incremental synchronization, task editing, and review-first AI proposals—while remaining open to contributing suitable changes upstream.
 
-A terminal application for interacting with Todoist, built in Rust with a modern TUI interface.
+<img src="docs/images/screenshot1.png" width="48%" alt="Terminalist Edge task list and smart views"> <img src="docs/images/screenshot2.png" width="48%" alt="Terminalist Edge task details">
 
-<img src="docs/images/screenshot1.png" width="48%" alt="Terminalist main interface"> <img src="docs/images/screenshot2.png" width="48%" alt="Terminalist task details">
+## Status and distribution
 
-## Features
+Terminalist Edge is experimental software that can create, edit, complete, and delete real Todoist data. Review the limitations and start with data you can recover.
 
-- **Interactive TUI Interface** - Beautiful terminal user interface with ratatui
-- **Local Data Caching** - Fast, responsive UI with in-memory SQLite storage
-- **Smart Sync** - Incremental synchronization on startup and manual refresh with `r`
-- **Project Management** - Browse projects with hierarchical display
-- **Task Management** - View, navigate, create, edit, schedule, and complete tasks
-- **Agenda & Smart Views** - Move between Today, Agenda, Tomorrow, Upcoming, and Trash
-- **Recoverable Deletion** - Restore recently deleted tasks from a 30-day local Trash
-- **Task Search** - Fast database-powered search across all tasks with '/' shortcut
-- **Review-first AI Assistance** - Generate and revise task-management proposals before explicitly applying Todoist changes
-- **Keyboard & Mouse Navigation** - Efficient keyboard operation with mouse support
-- **Real-time Updates** - Create, complete, and delete tasks/projects
-- **Label Support** - View task labels with colored badges
-- **Responsive Layout** - Adapts to terminal size with smart scaling
-- **Help System** - Built-in help panel with keyboard shortcuts
-- **Configuration File** - Customizable settings via TOML configuration
+The latest GitHub release is `v0.7.2`. It is source-only and has no prebuilt assets. The `main` branch currently identifies itself as `0.7.3` and contains changes made after that release.
 
-## Installation
+Homebrew, AUR, crates.io, and other packages named `terminalist` currently install the upstream project, not Terminalist Edge. This repository also retains the upstream `terminalist` crate, binary, configuration, and local-data names for compatibility, so installing Edge can replace an upstream `terminalist` command and both editions can address the same local files. Back up the Terminalist data directory before switching editions and do not alternate between them unless their schema compatibility has been verified.
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/terminalist.svg)](https://repology.org/project/terminalist/versions)
+## What Edge adds
 
-### Option 1: Install from Homebrew (macOS & Linux)
+- Today, Agenda, Tomorrow, Upcoming, and Trash smart views in an always-visible navigation bar
+- Incremental Todoist synchronization with transactional sync-token updates and full-sync recovery
+- Task details plus title, description, schedule, project, priority, completion, and due-date workflows
+- Context-aware task creation and responsive navigation while background refreshes finish
+- A collapsible Projects & Labels rail with persisted layout state
+- Locally retained Trash records for 30 days after remote deletion, with recreation-based restore
+- Review-first OpenAI proposals with bounded, read-only project/task lookup tools and explicit confirmation before proposed Todoist mutations
+
+Inherited Terminalist capabilities include local SQLite caching, project and label browsing, task search, keyboard and mouse navigation, configurable display settings, and periodic or manual Todoist synchronization.
+
+## Requirements
+
+- Rust 1.92 or later; the repository pins the expected toolchain in `rust-toolchain.toml`
+- A Todoist account and personal API token
+- A terminal with standard TUI and color support
+- An OpenAI API key only if you choose to use AI task management
+
+## Install from source
+
+Install the latest published Edge release:
 
 ```bash
-brew tap romaintb/terminalist
-brew install terminalist
+git clone https://github.com/rsheyd/terminalist-edge.git
+cd terminalist-edge
+git checkout v0.7.2
+cargo install --locked --path .
 ```
 
-### Option 2: Install from AUR (Arch Linux)
+To test current development instead, stay on `main` before running `cargo install`. Both paths install a binary named `terminalist`.
+
+Set your Todoist token in the environment, then start the app:
 
 ```bash
-yay -S terminalist # Or any other AUR helper (eg: paru)
-```
-
-### Option 3: Install from Crates.io
-
-```bash
-cargo install terminalist
-```
-
-### Option 4: Build from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/romaintb/terminalist.git; cd terminalist
-cargo build --release # Build the project
-cargo run --release # Run the application
-```
-
-The binary will be available at `target/release/terminalist` after building.
-
-### Help Wanted: Package Maintainers
-
-We support Homebrew for installation! For other distributions (Debian/Ubuntu, Fedora, NixOS, etc.), we're looking for help packaging Terminalist. If you're interested in maintaining a package, please open an issue or submit a PR!
-
-## Setup
-
-### 1. Get your Todoist API Token
-
-1. Go to [Todoist Integrations Settings](https://todoist.com/prefs/integrations)
-2. Find the "API token" section
-3. Copy your API token
-
-### 2. Set Environment Variable
-
-```bash
-export TODOIST_API_TOKEN=your_token_here
-```
-
-### 3. (Optional) Generate Configuration File
-
-```bash
-# Generate a default config file with all available options
-terminalist --generate-config
-```
-
-This creates a config file at `~/.config/terminalist/config.toml` with customizable settings.
-
-### 4. Run the Application
-
-```bash
+export TODOIST_API_TOKEN="your-token"
 terminalist
 ```
 
-## Configuration
+The token is read from the environment and then stored in Terminalist's local SQLite database as part of its Todoist backend configuration. That database is not encrypted by Terminalist; protect it with normal operating-system account and disk security. See [Privacy and data handling](PRIVACY.md) before using real account data.
 
-Terminalist supports customization via TOML configuration files.
+## First run
+
+1. Create a Todoist API token from [Todoist integration settings](https://todoist.com/prefs/integrations).
+2. Export `TODOIST_API_TOKEN` in the shell that launches Terminalist Edge.
+3. Run `terminalist`; the first startup creates the local database and synchronizes Todoist data.
+4. Use `Left` and `Right` for smart views, `[` and `]` for projects and labels, `j` and `k` for tasks, `Enter` for details, and `?` for built-in help.
+5. Press `r` whenever you want to request a manual synchronization.
+
+Generate an optional configuration file with:
 
 ```bash
-# Generate a default config file with all available options
 terminalist --generate-config
 ```
 
-This creates a config file at `~/.config/terminalist/config.toml`.
+See the [configuration guide](docs/CONFIGURATION.md) for platform-specific paths and available settings.
 
-📖 **See [Configuration Guide](docs/CONFIGURATION.md) for detailed configuration options.**
+## Important behavior and limitations
 
-## Quick Start Controls
+- Most ordinary task actions are sent to Todoist immediately after their confirmation dialog or command; this is not an offline editor with a later commit step.
+- Deleting a task first deletes it remotely, then retains a local tombstone for up to 30 days. Restoring from Trash creates a new Todoist task from cached fields; it does not recover the original remote task identity, comments, or every server-side relationship.
+- Emptying Trash removes only the retained local tombstones because the corresponding tasks were already deleted remotely.
+- Todoist does not provide an atomic transaction for the multi-action AI workflow. Approved actions run in a safe order, stop on failure, report partial results, and complete the original task last.
+- The AI feature is optional, but when invoked it sends task information and user-supplied context to OpenAI and can return bounded portions of cached project or task data through model-requested read-only tools.
+- Edge does not currently have a distinct package, executable, configuration, or database namespace from upstream Terminalist.
 
-Essential keyboard shortcuts to get started:
+## AI task management
+
+From a task's details, press `m` to open **Manage task with AI…**. Terminalist sends the selected task and your explanation to the configured OpenAI model, validates the structured proposal, and shows the recommendation and individual proposed actions. You can revise the proposal, disable actions, cancel without changes, or continue to a separate application confirmation.
+
+The feature is not a general autonomous agent: its proposal schema and mutation types are restricted, and model-requested context tools can only read bounded cached project/task data. Applying approved actions can nevertheless change real Todoist data.
+
+Configuration uses an environment-variable name rather than storing the OpenAI key itself:
+
+```toml
+[ai]
+model = "gpt-5.6-sol"
+api_key_env = "OPENAI_API_KEY"
+```
+
+```bash
+export OPENAI_API_KEY="your-key"
+```
+
+The checked-in default environment-variable name reflects a personal development setup, so public users should set `ai.api_key_env` explicitly. See [AI task management and data flow](docs/AI_TASK_MANAGEMENT.md) for the exact review boundary and information shared with OpenAI.
+
+## Essential controls
 
 | Key | Action |
 |-----|--------|
-| `j/k` | Navigate tasks up/down |
-| `Left/Right` | Cycle smart views in the top bar |
-| `]/[` or `J/K` | Navigate projects and labels in the sidebar |
-| `x` | Mark/unmark task for bulk actions |
-| `u` | Remove due date |
-| `Space` | Toggle task completion |
-| `a` | Create new task |
-| `/` | Search tasks |
-| `b` | Expand/collapse the Projects & Labels sidebar |
-| `r` | Sync with Todoist |
-| `?` | Show help panel |
+| `j` / `k` | Move between tasks |
+| `Left` / `Right` | Cycle smart views |
+| `]` / `[` or `J` / `K` | Move through projects and labels |
+| `Enter` | Open task details |
+| `a` | Create a task |
+| `Space` | Complete or reopen the current or marked tasks |
+| `x` | Mark a task for bulk actions |
+| `/` | Search cached tasks |
+| `r` | Synchronize with Todoist |
+| `b` | Collapse or expand Projects & Labels |
+| `?` | Open help |
 | `q` | Quit |
 
-📖 **See [Complete Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md) for all available controls and interface details.**
+See [keyboard shortcuts](docs/KEYBOARD_SHORTCUTS.md) for editing, scheduling, Trash, AI review, mouse, and dialog controls.
 
-## How It Works
+## Documentation
 
-Terminalist uses a smart sync mechanism:
-- **Fast Startup**: In-memory SQLite database for instant loading
-- **Auto Sync**: Syncs with Todoist on startup and every 5 minutes
-- **Manual Sync**: Press `r` to force refresh from Todoist
-- **Real-time Updates**: Create, modify, and delete tasks/projects immediately
+- [Configuration](docs/CONFIGURATION.md)
+- [Keyboard shortcuts](docs/KEYBOARD_SHORTCUTS.md)
+- [AI task management and data flow](docs/AI_TASK_MANAGEMENT.md)
+- [Privacy and local data](PRIVACY.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Changelog](CHANGELOG.md)
+- [Releasing](docs/RELEASING.md)
 
-📖 **See [Architecture Guide](docs/ARCHITECTURE.md) for technical details.**
+## Relationship to upstream
 
-## Contributing
+Terminalist Edge is maintained by [Roman Sheydvasser](https://github.com/rsheyd) and is not an official upstream release. The original Terminalist project is maintained at [romaintb/terminalist](https://github.com/romaintb/terminalist). Edge retains upstream package metadata and copyright notices while its downstream changes are evaluated and, where practical, proposed upstream as focused contributions.
 
-Contributions are welcome! See [Development Guide](docs/DEVELOPMENT.md) for setup instructions and coding standards.
+If you want upstream Terminalist rather than the Edge feature set, use the upstream repository and its official package instructions.
 
 ## License
 
-This project is open source. Feel free to modify and use as needed.
+Terminalist Edge is distributed under the [MIT License](LICENSE). The included copyright notice identifies the upstream copyright holder and must be preserved with copies or substantial portions of the software.

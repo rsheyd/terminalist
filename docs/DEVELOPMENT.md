@@ -83,13 +83,13 @@ This is a fully-featured TUI application for Todoist. You can extend it by:
 
 This project uses the following Rust crates (see `Cargo.toml` for exact versions):
 
-- `todoist-api = "0.3.0"` - Unofficial Todoist API client
-- `ratatui = "0.29"` - Terminal UI framework
+- `todoist-api = "1.0.0-alpha.2"` - Unofficial Todoist API client
+- `ratatui = "0.30"` - Terminal UI framework
 - `crossterm = "0.29"` - Cross-platform terminal handling
 - `tokio = "1.x"` - Async runtime
-- `sqlx = "0.8"` - Database toolkit with SQLite support
+- `sea-orm = "1.1"` - ORM and SQLite persistence layer
 - `serde` - Serialization/deserialization
 - `chrono = "0.4"` - Date and time handling
 - `anyhow = "1.0"` - Error handling
-- `toml = "0.8"` - Configuration file parsing
-- `dirs = "5.0"` - Platform-specific directory paths
+- `toml = "1.0"` - Configuration file parsing
+- `dirs = "6.0"` - Platform-specific directory paths

@@ -13,6 +13,9 @@
 - `src/ui/`: actions, navigation, dialogs, and TUI components.
 - `tests/`: integration and UI behavior tests.
 - `docs/KEYBOARD_SHORTCUTS.md`: user-facing controls and view behavior.
+- `docs/AI_TASK_MANAGEMENT.md`: user-facing AI setup, review boundary, provider data flow, and partial-failure behavior.
+- `PRIVACY.md`: local persistence, credential handling, Todoist mutations, and optional OpenAI requests.
+- `docs/PRD.md`: historical upstream-era planning document; not authoritative for current Edge behavior.
 - `docs/POST_PR188_CHANGES.md`: branch-local feature ledger and future PR source notes.
 - `docs/AI_TASK_MANAGEMENT_PLAN.md`: proposed AI-assisted task-management workflow and implementation plan.
 - `docs/RELEASING.md`: versioning, validation, tagging, and GitHub release checklist.

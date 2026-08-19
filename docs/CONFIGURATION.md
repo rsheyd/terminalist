@@ -4,10 +4,13 @@ This document explains how to configure Terminalist.
 
 ## Configuration Files
 
-Terminalist supports configuration via TOML files. Configuration files are loaded in the following order of precedence:
-1. `./terminalist.toml` (project-specific config)
-2. `~/.config/terminalist/config.toml` (user config)
+Terminalist supports configuration via TOML files. Configuration is loaded in this order:
+
+1. `./terminalist.toml` in the current working directory
+2. `terminalist/config.toml` beneath the operating system's standard configuration directory
 3. Built-in defaults
+
+Typical user paths are `~/Library/Application Support/terminalist/config.toml` on macOS and `${XDG_CONFIG_HOME:-~/.config}/terminalist/config.toml` on Linux.
 
 ## Generate Default Configuration
 
@@ -15,7 +18,7 @@ Terminalist supports configuration via TOML files. Configuration files are loade
 terminalist --generate-config
 ```
 
-This creates a config file at `~/.config/terminalist/config.toml` with all available options.
+This creates the user configuration file at the platform-appropriate path and prints that path.
 
 ## Configuration Options
 
@@ -24,7 +27,7 @@ This creates a config file at `~/.config/terminalist/config.toml` with all avail
 ```toml
 [ai]
 model = "gpt-5.6-sol"
-api_key_env = "OPENAI_VALERIA_API_KEY"
+api_key_env = "OPENAI_API_KEY"
 
 [ui]
 default_project = "today"         # Options: "inbox", "today", "tomorrow", "upcoming", project ID, or project name
@@ -50,16 +53,12 @@ enabled = false                   # Enable logging to file
 
 ### AI Task Management
 
-- **model**: OpenAI model used to generate proposals. The default is
-  `gpt-5.6-sol`.
-- **api_key_env**: Name of the environment variable containing the API key.
-  The current personal setup uses `OPENAI_VALERIA_API_KEY`. This is a temporary
-  credential source and can be changed later without changing code.
+- **model**: OpenAI model used to generate proposals. The default is `gpt-5.6-sol`.
+- **api_key_env**: Name of the environment variable containing the OpenAI API key. The checked-in default uses `OPENAI_VALERIA_API_KEY` for a personal development environment; public users should set this explicitly, commonly to `OPENAI_API_KEY` as shown above.
 
-Terminalist reads the key at runtime and never writes its value to the
-configuration file or logs. For a shell launch, export the variable before
-starting Terminalist; placing the export in `~/.zshrc` is appropriate when the
-app is normally launched from an interactive zsh shell.
+Terminalist reads the OpenAI key at runtime and never writes its value to the configuration file, database, or logs. Export the configured variable in the shell that launches Terminalist.
+
+The separate `TODOIST_API_TOKEN` is also read from the environment, but the current backend implementation persists that Todoist token in the local SQLite database as unencrypted JSON credentials. See [Privacy and Local Data](../PRIVACY.md).
 
 ### UI Configuration
 
@@ -67,9 +66,7 @@ app is normally launched from an interactive zsh shell.
   - Options: `"inbox"`, `"today"`, `"tomorrow"`, `"upcoming"`, a specific project ID, or project name
 - **mouse_enabled**: Enable or disable mouse support
 - **sidebar_width**: Width of the sidebar in columns (must be between 15-50)
-- **sidebar_visible**: Initial sidebar state. After the first layout change, Terminalist
-  restores the last expanded/collapsed state and expanded width from
-  `~/.config/terminalist/ui-state.toml`.
+- **sidebar_visible**: Initial sidebar state. After the first layout change, Terminalist restores the last expanded/collapsed state and expanded width from `ui-state.toml` beside the user configuration file.
 - **shortcut_bar_visible**: Show or hide the common keyboard-shortcut bar at the bottom
 
 ### Sync Configuration
